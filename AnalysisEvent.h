@@ -2,62 +2,83 @@
 #define ANALYSISEVENT_H
 
 #include <vector>
-
 #include "TVector3.h"
-
 #include "EventCategory.h"
 
 struct AnalysisEvent
 {
-    // **** Truth variables ****
-
-    int mc_nu_pdg;
-
-    float mc_nu_vx;
-    float mc_nu_vy;
-    float mc_nu_vz;
-
-    float mc_nu_energy;
-
-    int mc_nu_ccnc;
-    int mc_nu_interaction_type;
-
-    bool is_mc;
-    bool mc_neutrino_is_numu;
-    bool mc_vertex_in_FV;
-    bool mc_muon_in_mom_range;
-
-    bool mc_no_fs_hyperons;
-    bool mc_is_signal; 
-
-    EventCategory category;
-
-    // **** Reconstructed variables **** 
-
+    // **** Reconstruction variables ****
     float topological_score;
 
-    float nu_vx;
-    float nu_vy;
-    float nu_vz;
+    int nu_pdg_;
+    int nslices_;
+    
+    float nu_vx_;
+    float nu_vy_;
+    float nu_vz_;
 
-    int num_pf_particles;
-    int num_tracks;
-    int num_showers;
+    int num_pf_particles_;
+    int num_tracks_;
+    int num_showers_;
 
-    // **** Recostruction selection  ****
+    std::vector<unsigned int> pfp_generation_;
+    std::vector<unsigned int> pfp_trk_daughters_count_;
+    std::vector<unsigned int> pfp_shr_daughters_count_;
 
-    bool sel_nu_mu_cc;
-    bool sel_reco_vertex_in_FV;
-    bool sel_topo_cut_passed;
+    std::vector<float> pfp_track_score_;
+    std::vector<int> pfp_reco_pdg_;
 
-    bool sel_has_muon_candidate;
-    bool sel_muon_contained;
-    bool sel_muon_quality_ok;
-    bool sel_muon_passed_mom_cuts;
+    std::vector<int> pfp_hits_;
 
-    int muon_candidate_idx;
-    int piplus_candidate_idx;
-    int piminus_candidate_idx;
+    std::vector<int> pfp_hitsU_;
+    std::vector<int> pfp_hitsV_;
+    std::vector<int> pfp_hitsY_;
+
+    std::vector<int> pfp_true_pdg_;
+
+    std::vector<float> pfp_true_E_;
+    std::vector<float> pfp_true_px_;
+    std::vector<float> pfp_true_py_;
+    std::vector<float> pfp_true_pz_;
+
+    std::vector<unsigned long> shower_pfp_id_;
+    std::vector<float> shower_startx_;
+    std::vector<float> shower_starty_;
+    std::vector<float> shower_startz_;
+    std::vector<float> shower_start_distance_;
+
+    std::vector<unsigned long> track_pfp_id_;
+    std::vector<float> track_length_;
+    std::vector<float> track_startx_;
+    std::vector<float> track_starty_;
+    std::vector<float> track_startz_;
+    std::vector<float> track_start_distance_;
+    std::vector<float> track_endx_;
+    std::vector<float> track_endy_;
+    std::vector<float> track_endz_;
+    std::vector<float> track_dirx_;
+    std::vector<float> track_diry_;
+    std::vector<float> track_dirz_;
+
+    // **** Simulation variables ****
+    int mc_nu_pdg_;
+
+    float mc_nu_vx_;
+    float mc_nu_vy_;
+    float mc_nu_vz_;
+
+    float mc_nu_energy_;
+    float mc_nu_ccnc_;
+
+    int mc_nu_interaction_type_;
+
+    std::vector<int> mc_nu_daughter_pdg_;
+    std::vector<float> mc_nu_daughter_energy_;
+    std::vector<float> mc_nu_daughter_px_;
+    std::vector<float> mc_nu_daughter_py_;
+    std::vector<float> mc_nu_daughter_pz_;
+
+    EventCategory category;
 };
 
 #endif // ANALYSISEVENT_H

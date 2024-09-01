@@ -10,7 +10,6 @@
 
 #include "AnalysisEvent.h"
 #include "EventCategory.h"
-#include "FiducialVolume.h"
 #include "Constants.h"
 
 class EventAssembler
@@ -32,12 +31,7 @@ public:
     EventAssembler(const std::string& input_name)
     {
         file_ = TFile::Open(input_name.c_str(), "READ");
-        if(!file_ || !file_->IsOpen())
-        {
-            throw std::runtime_error("Could not open file " + input_name);
-        }
-
-        tree_ = dynamic_cast<TTree*>(file_->Get(""));
+        tree_ = dynamic_cast<TTree*>(file_->Get("nuselection/NeutrinoSelectionFilter"));
 
         num_events_ = tree_->GetEntries();
 
@@ -53,22 +47,13 @@ public:
         }
     }
 
-    AnalysisEvent get_event(int i)
+    AnalysisEvent get_event(int i) const
     {
         tree_->GetEntry(i);
 
         AnalysisEvent e;
-        e.mc_nu_pdg = mc_nu_pdg_;
-        e.mc_nu_vx = mc_nu_vtx_x_;
-        e.mc_nu_vy = mc_nu_vtx_y_;
-        e.mc_nu_vz = mc_nu_vtx_z_;
 
-        e.mc_nu_energy = mc_nu_energy_;
-        e.mc_nu_ccnc = mc_nu_ccnc_;
-
-        e.mc_nu_interaction_type = mc_nu_interaction_type_;
-
-        e.category = categorise_event();
+        
 
         return e;
     }
@@ -82,33 +67,57 @@ private:
 
     TFile* file_;
     TTree* tree_;
+
     int num_events_;
 
-    int mc_nu_pdg_;
+    int nu_pdg_;
+    int ccnc_;
+    int nu_parent_pdg_;
+    int interaction_;
+    float nu_e_;
+
+    float true_nu_vtx_x_;
+    float true_nu_vtx_y_;
+    float true_nu_vtx_z_;
     
-    float mc_nu_vtx_x_;
-    float mc_nu_vtx_y_;
-    float mc_nu_vtx_z_;
+    float reco_nu_vtx_x_;
+    float reco_nu_vtx_y_;
+    float reco_nu_vtx_z_;
 
-    float mc_nu_energy_;
-    int mc_nu_ccnc_;
+    std::vector<int> backtracked_pdg_;
+    std::vector<float> backtracked_e_;
+    std::vector<int> backtracked_tid_;
 
-    int mc_nu_interaction_type_;
-
-    EventCategory event_category_;
+    std::vector<float> backtracked_px_;
+    std::vector<float> backtracked_py_;
+    std::vector<float> backtracked_pz_;
 
     void set_branch_addresses()
     {
-        tree_->SetBranchAddress("mc_nu_pdg", &mc_nu_pdg_);
+        // Reconstruction variables
+        tree_->SetBranchAddress("topological_score", &topological_score_);
 
-        tree_->SetBranchAddress("mc_nu_vtx_x", &mc_nu_vtx_x_);
-        tree_->SetBranchAddress("mc_nu_vtx_y", &mc_nu_vtx_y_);
-        tree_->SetBranchAddress("mc_nu_vtx_z", &mc_nu_vtx_z_);
+        tree_->SetBranchAddress("nu_pdg", &nu_pdg_);
+        tree->SetBranchAddress("ccnc", &ccnc_);
+        tree->SetBranchAddress("nu_parent_pdg", &nu_parent_pdg_);
+        tree->SetBranchAddress("interaction", &interaction_);
+        tree->SetBranchAddress("nu_e", &nu_e_);
 
-        tree_->SetBranchAddress("mc_nu_energy", &mc_nu_energy_);
-        tree_->SetBranchAddress("mc_nu_ccnc", &mc_nu_ccnc_);
+        tree_->SetBranchAddress("true_nu_vtx_x", &true_nu_vtx_x_);
+        tree_->SetBranchAddress("true_nu_vtx_y", &true_nu_vtx_y_);
+        tree_->SetBranchAddress("true_nu_vtx_z", &true_nu_vtx_z_);
+        
+        tree_->SetBranchAddress("reco_nu_vtx_sce_x", &reco_nu_vtx_x_);
+        tree_->SetBranchAddress("reco_nu_vtx_sce_y", &reco_nu_vtx_y_);
+        tree_->SetBranchAddress("reco_nu_vtx_sce_z", &reco_nu_vtx_z_);
 
-        tree_->SetBranchAddress("interaction", &mc_nu_interaction_type_);
+        tree_->SetBranchAddress("backtracked_pdg", &backtracked_pdg_);
+        tree_->SetBranchAddress("backtracked_e", &backtracked_e_);
+        tree_->SetBranchAddress("backtracked_tid", &backtracked_tid_);
+
+        tree_->SetBranchAddress("backtracked_px", &backtracked_px_);
+        tree_->SetBranchAddress("backtracked_py", &backtracked_py_);
+        tree_->SetBranchAddress("backtracked_pz", &backtracked_pz_);
     }
 
     EventCategory categorise_event() const
@@ -118,10 +127,10 @@ private:
         if (!is_mc) 
             return kUnknown;
 
-        bool mc_vertex_in_FV = point_inside_FV(mc_nu_vtx_x_, mc_nu_vtx_y_, mc_nu_vtx_z_);
+        bool mc_nu_vtx_inside_fv = point_inside_fv(mc_nu_vtx_x_, mc_nu_vtx_y_, mc_nu_vtx_z_);
         bool mc_neutrino_is_numu = (mc_nu_pdg_ == MUON_NEUTRINO);
 
-        if (!mc_vertex_in_FV) 
+        if (!mc_nu_vtx_inside_fv) 
         {
             return kOOFV;
         }
@@ -134,7 +143,7 @@ private:
             return kOther;
         }
 
-        bool mc_is_signal = mc_vertex_in_FV && mc_neutrino_is_numu;
+        bool mc_is_signal = mc_nu_vtx_inside_fv && mc_neutrino_is_numu;
         if (mc_is_signal) 
         {
             if (mc_nu_interaction_type_ == 0) 
