@@ -64,28 +64,6 @@ public:
 
     void print_event(const AnalysisEvent& event) const
     {
-        std::cout << "------------------------------------" << std::endl;
-        std::cout << std::setw(25) << std::left << "Analysis Event" << std::endl;
-        std::cout << "------------------------------------" << std::endl;
-
-        std::cout << std::setw(25) << std::left << "Nu PDG Code: " << event.mc_nu_pdg << std::endl;
-        std::cout << std::setw(25) << std::left << "Nu Energy: " << event.mc_nu_energy << " GeV" << std::endl;
-        std::cout << std::setw(25) << std::left << "CC/NC Interaction: " << (event.mc_nu_ccnc == 0 ? "CC" : "NC") << std::endl;
-        std::cout << std::setw(25) << std::left << "Interaction Type: " << event.mc_nu_interaction_type << std::endl;
-
-        std::cout << "\n--- True Neutrino Vertex (x, y, z) ---" << std::endl;
-        std::cout << std::setw(25) << std::left << "True Vtx X: " << event.mc_nu_vtx_x << std::endl;
-        std::cout << std::setw(25) << std::left << "True Vtx Y: " << event.mc_nu_vtx_y << std::endl;
-        std::cout << std::setw(25) << std::left << "True Vtx Z: " << event.mc_nu_vtx_z << std::endl;
-
-        std::cout << "\n--- Reconstructed Neutrino Vertex (x, y, z) ---" << std::endl;
-        std::cout << std::setw(25) << std::left << "Reco Vtx X: " << event.nu_vtx_x << std::endl;
-        std::cout << std::setw(25) << std::left << "Reco Vtx Y: " << event.nu_vtx_y << std::endl;
-        std::cout << std::setw(25) << std::left << "Reco Vtx Z: " << event.nu_vtx_z << std::endl;
-
-        std::cout << "\nTopological Score: " << event.topological_score << std::endl;
-
-        std::cout << "------------------------------------" << std::endl;
     }
 
 private:

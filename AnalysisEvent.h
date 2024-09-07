@@ -5,7 +5,6 @@
 
 #include "TreeUtilities.h"
 #include "Constants.h"
-#include "FiducialVolume.h"
 
 enum EventCategory
 {
@@ -18,8 +17,7 @@ enum EventCategory
     kNuMuCC0kshrt0hyp = 6,
     kNuMuCCOther = 7,
     kNC = 8,
-    kOOFV = 9,
-    kOther = 10,
+    kOther = 9,
 };
 
 struct AnalysisEvent
@@ -110,7 +108,6 @@ static const std::map<EventCategory, std::string> event_category_to_label_map = 
     { kNuMuCC0kshrt0hyp, "#nu_{#mu} CC0kshrt0hyp" },
     { kNuMuCCOther, "Other #nu_{#mu} CC" },
     { kNC, "NC" },
-    { kOOFV, "Out FV" },
     { kOther, "Other" }
 };
 
@@ -124,8 +121,7 @@ static const std::map<EventCategory, int> event_category_to_colour_map = {
     { kNuMuCC0kshrt0hyp, kAzure - 1 },
     { kNuMuCCOther, kAzure },
     { kNC, kOrange },
-    { kOOFV, kRed + 3 },
-    { kOther, kRed + 1 }
+    { kOther, kRed + 3 }
 };
 
 inline std::string get_event_category_label(EventCategory ec) 
@@ -153,23 +149,14 @@ inline EventCategory categorise_event(const AnalysisEvent& e)
     if (!is_mc) 
         return kUnknown;
 
-    bool mc_nu_vtx_inside_fv = point_inside_fv(e.mc_nu_vtx_x, e.mc_nu_vtx_y, e.mc_nu_vtx_z);
     bool mc_neutrino_is_numu = (e.mc_nu_pdg == MUON_NEUTRINO);
 
-    if (!mc_nu_vtx_inside_fv) 
-    {
-        return kOOFV;
-    }
-    else if (e.mc_nu_ccnc == NEUTRAL_CURRENT) 
-    {
+    if (e.mc_nu_ccnc == NEUTRAL_CURRENT) 
         return kNC;
-    }
     else if (!mc_neutrino_is_numu) 
-    {
         return kOther;
-    }
 
-    bool mc_is_signal = mc_nu_vtx_inside_fv && mc_neutrino_is_numu;
+    bool mc_is_signal = mc_neutrino_is_numu;
     if (mc_is_signal) 
     {
         if (e.mc_nu_interaction_type == 0) 
@@ -182,7 +169,5 @@ inline EventCategory categorise_event(const AnalysisEvent& e)
             return kSignalOther;
     }
     else 
-    {
         return kOther;
-    }
 }

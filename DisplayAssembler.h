@@ -179,7 +179,6 @@ private:
                 else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
                 else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
                 else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
-                else if (pdg == 2112) pdgGraphs[pdg]->SetMarkerColor(kPurple); // Neutron
             }
 
             pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_u_drift_->at(i), hits_u_wire_->at(i));
@@ -213,7 +212,6 @@ private:
                 else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
                 else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
                 else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
-                else if (pdg == 2112) pdgGraphs[pdg]->SetMarkerColor(kPurple); // Neutron
             }
 
             pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_v_drift_->at(i), hits_v_wire_->at(i));
@@ -247,7 +245,6 @@ private:
                 else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
                 else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
                 else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
-                else if (pdg == 2112) pdgGraphs[pdg]->SetMarkerColor(kPurple); // Neutron
             }
 
             pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_w_drift_->at(i), hits_w_wire_->at(i));
@@ -322,10 +319,10 @@ private:
             kSpring, kTeal, kAzure, kRose, kGray, kBlack, kOrange + 7, kBlue - 9, kGreen + 3
         };
 
-        int colorMapIndex = 0;
+        int colour_map_index = 0;
         for (size_t i = 0; i < reco_hits_u_drift_->size(); ++i) {
-            int particle_color = color_map[colorMapIndex];
-            colorMapIndex++;
+            int particle_color = color_map[colour_map_index];
+            colour_map_index++;
 
             TGraph* pfp_graph_u = new TGraph();
             pfp_graph_u->SetMarkerStyle(20);
@@ -343,10 +340,10 @@ private:
             reco_mg_u->Add(pfp_graph_u);
         }
 
-        colorMapIndex = 0;
+        colour_map_index = 0;
         for (size_t i = 0; i < reco_hits_v_drift_->size(); ++i) {
-            int particle_color = color_map[colorMapIndex];
-            colorMapIndex++;
+            int particle_color = color_map[colour_map_index];
+            colour_map_index++;
 
             TGraph* pfp_graph_v = new TGraph();
             pfp_graph_v->SetMarkerStyle(20);
@@ -364,10 +361,10 @@ private:
             reco_mg_v->Add(pfp_graph_v);
         }
 
-        colorMapIndex = 0;
+        colour_map_index = 0;
         for (size_t i = 0; i < reco_hits_w_drift_->size(); ++i) {
-            int particle_color = color_map[colorMapIndex];
-            colorMapIndex++;
+            int particle_color = color_map[colour_map_index];
+            colour_map_index++;
 
             TGraph* pfp_graph_w = new TGraph();
             pfp_graph_w->SetMarkerStyle(20);
