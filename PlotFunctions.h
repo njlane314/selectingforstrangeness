@@ -1,5 +1,5 @@
-#ifndef _plot_utils_h_
-#define _plot_utils_h_
+#ifndef _plot_functions_h_
+#define _plot_functions_h_
 
 #include "TH1D.h"
 #include "TH2D.h"
@@ -12,8 +12,8 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace plot_utils {
-
+namespace plot_functions 
+{
     const double single_canvas_x = 800;
     const double single_canvas_y = 600; 
     const double single_pad_split = 0.85;
@@ -90,11 +90,9 @@ namespace plot_utils {
 
         h->SetStats(0);
 
-        c->SaveAs((plotdir + "/" + title + ".png").c_str());
         c->SaveAs((plotdir + "/" + title + ".pdf").c_str());
         delete c;
     }
-
 } 
 
-#endif // _plot_utils_h_
+#endif // _plot_functions_h_
