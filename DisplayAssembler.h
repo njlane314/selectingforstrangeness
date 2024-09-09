@@ -262,7 +262,7 @@ private:
         mg_w->GetYaxis()->SetTitleSize(0.05);
 
         std::string filename = "true_interaction_hits_" + std::to_string(run_) + "_" + std::to_string(subrun_) + "_" + std::to_string(event_);
-        c4->SaveAs(("./plots/" + filename + ".pdf").c_str());
+        c4->SaveAs(("./plots/disp/" + filename + ".pdf").c_str());
     }
 
     void display_reconstructed_hits() const {
@@ -315,8 +315,8 @@ private:
         reco_vertex_w->SetMarkerSize(1.2);
 
         std::vector<int> color_map = {
-            kRed, kBlue, kGreen, kMagenta, kCyan, kYellow, kOrange, kPink, kViolet,
-            kSpring, kTeal, kAzure, kRose, kGray, kBlack, kOrange + 7, kBlue - 9, kGreen + 3
+            kMagenta, kCyan, kYellow, kAzure, kSpring, kTeal, kRose, kGray, kBlack, kViolet,
+            kOrange + 7, kBlue - 9, kGreen + 3, kViolet + 9, kCyan + 3, kYellow + 2, kGray + 2
         };
 
         int colour_map_index = 0;
@@ -401,7 +401,7 @@ private:
         reco_mg_w->GetYaxis()->SetTitleSize(0.05);
 
         std::string filename = "reco_interaction_hits_" + std::to_string(run_) + "_" + std::to_string(subrun_) + "_" + std::to_string(event_);
-        c5->SaveAs(("./plots/" + filename + ".pdf").c_str());
+        c5->SaveAs(("./plots/disp/" + filename + ".pdf").c_str());
     }
 };
 

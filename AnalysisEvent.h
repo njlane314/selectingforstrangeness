@@ -22,6 +22,8 @@ enum EventCategory
 
 struct AnalysisEvent
 {
+    int event, run, subrun;
+
     // **** Simulation variables ****
     int mc_nu_pdg;
 
@@ -39,6 +41,15 @@ struct AnalysisEvent
     tree_utils::ManagedPointer<std::vector<float>> mc_nu_daughter_py;
     tree_utils::ManagedPointer<std::vector<float>> mc_nu_daughter_pz;
 
+    bool mc_has_muon;
+
+    int mc_muon_tid;
+    int mc_muon_pdg;
+    float mc_muon_energy;
+    float mc_muon_px, mc_muon_py, mc_muon_pz;
+    float mc_muon_startx, mc_muon_starty, mc_muon_startz;
+    float mc_muon_endx, mc_muon_endy, mc_muon_endz;
+
     float mc_kshrt_total_energy;
     float mc_kshrt_endx, mc_kshrt_endy, mc_kshrt_endz;
     float mc_kshrt_end_sep;
@@ -51,6 +62,12 @@ struct AnalysisEvent
 
     float mc_kshrt_piminus_energy;
     float mc_kshrt_piminus_px, mc_kshrt_piminus_py, mc_kshrt_piminus_pz;
+
+    float mc_kshrt_piplus_startx, mc_kshrt_piplus_starty, mc_kshrt_piplus_startz;
+    float mc_kshrt_piplus_endx, mc_kshrt_piplus_endy, mc_kshrt_piplus_endz;
+
+    float mc_kshrt_piminus_startx, mc_kshrt_piminus_starty, mc_kshrt_piminus_startz;
+    float mc_kshrt_piminus_endx, mc_kshrt_piminus_endy, mc_kshrt_piminus_endz;
 
     unsigned int mc_kshrt_piplus_n_elas;
     unsigned int mc_kshrt_piplus_n_inelas;
@@ -80,22 +97,20 @@ struct AnalysisEvent
     int n_trks;
     int n_shwrs;
 
-    /*std::vector<unsigned int> pfp_generation;
-    std::vector<unsigned int> pfp_trk_daughters_count;
-    std::vector<unsigned int> pfp_shr_daughters_count;
+    tree_utils::ManagedPointer<std::vector<int>> backtracked_tid;
+    tree_utils::ManagedPointer<std::vector<int>> backtracked_pdg;
+    tree_utils::ManagedPointer<std::vector<float>> backtracked_purity;
+    tree_utils::ManagedPointer<std::vector<float>> backtracked_completeness;
+    tree_utils::ManagedPointer<std::vector<float>> backtracked_overlay_purity;
 
-    std::vector<float> pfp_track_score;
-    std::vector<int> pfp_reco_pdg;
-    std::vector<int> pfp_hits;
-    std::vector<int> pfp_hits_uplane;
-    std::vector<int> pfp_hits_vplane;
-    std::vector<int> pfp_hits_yplane;
+    tree_utils::ManagedPointer<std::vector<int>> pfnhits;
 
-    std::vector<int> pfp_true_pdg;
-    std::vector<float> pfp_true_energy;
-    std::vector<float> pfp_true_px;
-    std::vector<float> pfp_true_py;
-    std::vector<float> pfp_true_pz;*/
+    tree_utils::ManagedPointer<std::vector<float>> pfp_muon_purity;
+    tree_utils::ManagedPointer<std::vector<float>> pfp_muon_completeness;
+    tree_utils::ManagedPointer<std::vector<float>> pfp_piplus_purity;
+    tree_utils::ManagedPointer<std::vector<float>> pfp_piplus_completeness;
+    tree_utils::ManagedPointer<std::vector<float>> pfp_piminus_purity;
+    tree_utils::ManagedPointer<std::vector<float>> pfp_piminus_completeness;
 };
 
 static const std::map<EventCategory, std::string> event_category_to_label_map = {

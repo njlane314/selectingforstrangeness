@@ -9,7 +9,7 @@
 #include "TFile.h"
 #include "TTree.h"
 
-void selection_analyser() 
+void backtrack_analyser() 
 {
     const char* data_dir = getenv("DATA_DIR");
     std::string input_file = std::string(data_dir) + "/analysis_prod_strange_resample_fhc_run2_fhc_reco2_reco2.root";
@@ -20,15 +20,19 @@ void selection_analyser()
     FiducialVolumeSelector fv_selector(FiducialVolumeSelector::kWirecell);
 
     int num_events = event_assembler.get_num_events();
-    int disp_count = 0;
+
+    int target_run = 9033;
+    int target_subrun = 356;
+    int target_event = 17802;
     for (int i = 0; i < num_events; ++i) {
         const AnalysisEvent& event = event_assembler.get_event(i);
-        if (event.mc_has_muon && event.mc_is_kshort_decay_pionic && disp_count < 30)
+        
+        if (event.run == target_run && event.subrun == target_subrun && event.event == target_event)
         {
-            display_assembler.plot_event(i);
-            disp_count++;
+            for (size_t j = 0; j < event.backtracked_tid->size(); ++j) 
+            {
+                std::cout << event.backtracked_pdg->at(j) << std::endl;
+            }
         }
-
-        bool fv_pass = fv_selector.pass_selection(event);
     }
 }

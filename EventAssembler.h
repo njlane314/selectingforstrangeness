@@ -77,6 +77,10 @@ private:
 
     void set_branch_addresses()
     {
+        tree_->SetBranchAddress("evt", &e_.event);
+        tree_->SetBranchAddress("run", &e_.run);
+        tree_->SetBranchAddress("sub", &e_.subrun);
+
         tree_->SetBranchAddress("nu_pdg", &e_.mc_nu_pdg);
         tree_->SetBranchAddress("true_nu_vtx_x", &e_.mc_nu_vtx_x);
         tree_->SetBranchAddress("true_nu_vtx_y", &e_.mc_nu_vtx_y);
@@ -91,11 +95,25 @@ private:
         set_object_input_branch_address(*tree_, "mc_py", e_.mc_nu_daughter_py);
         set_object_input_branch_address(*tree_, "mc_pz", e_.mc_nu_daughter_pz);
 
+        tree_->SetBranchAddress("mc_has_muon", &e_.mc_has_muon);
         tree_->SetBranchAddress("mc_is_kshort_decay_pionic", &e_.mc_is_kshort_decay_pionic);
         tree_->SetBranchAddress("mc_has_lambda", &e_.mc_has_lambda);
         tree_->SetBranchAddress("mc_has_sigma_plus", &e_.mc_has_sigma_plus);
         tree_->SetBranchAddress("mc_has_sigma_minus", &e_.mc_has_sigma_minus);
         tree_->SetBranchAddress("mc_has_sigma_zero", &e_.mc_has_sigma_zero);
+
+        tree_->SetBranchAddress("mc_muon_tid", &e_.mc_muon_tid); 
+        tree_->SetBranchAddress("mc_muon_pdg", &e_.mc_muon_pdg);
+        tree_->SetBranchAddress("mc_muon_energy", &e_.mc_muon_energy);
+        tree_->SetBranchAddress("mc_muon_px", &e_.mc_muon_px);
+        tree_->SetBranchAddress("mc_muon_py", &e_.mc_muon_py);
+        tree_->SetBranchAddress("mc_muon_pz", &e_.mc_muon_pz);
+        tree_->SetBranchAddress("mc_muon_startx", &e_.mc_muon_startx);
+        tree_->SetBranchAddress("mc_muon_starty", &e_.mc_muon_starty);
+        tree_->SetBranchAddress("mc_muon_startz", &e_.mc_muon_startz);
+        tree_->SetBranchAddress("mc_muon_endx", &e_.mc_muon_endx);
+        tree_->SetBranchAddress("mc_muon_endy", &e_.mc_muon_endy);
+        tree_->SetBranchAddress("mc_muon_endz", &e_.mc_muon_endz);
 
         tree_->SetBranchAddress("mc_kshrt_total_energy", &e_.mc_kshrt_total_energy);
         tree_->SetBranchAddress("mc_kaon_decay_x", &e_.mc_kshrt_endx);
@@ -109,11 +127,23 @@ private:
         tree_->SetBranchAddress("mc_kshrt_piplus_px", &e_.mc_kshrt_piplus_px);
         tree_->SetBranchAddress("mc_kshrt_piplus_py", &e_.mc_kshrt_piplus_py);
         tree_->SetBranchAddress("mc_kshrt_piplus_pz", &e_.mc_kshrt_piplus_pz);
+        tree_->SetBranchAddress("mc_kshrt_piplus_startx", &e_.mc_kshrt_piplus_startx);
+        tree_->SetBranchAddress("mc_kshrt_piplus_starty", &e_.mc_kshrt_piplus_starty);
+        tree_->SetBranchAddress("mc_kshrt_piplus_startz", &e_.mc_kshrt_piplus_startz);
+        tree_->SetBranchAddress("mc_kshrt_piplus_endx", &e_.mc_kshrt_piplus_endx);
+        tree_->SetBranchAddress("mc_kshrt_piplus_endy", &e_.mc_kshrt_piplus_endy);
+        tree_->SetBranchAddress("mc_kshrt_piplus_endz", &e_.mc_kshrt_piplus_endz);
 
         tree_->SetBranchAddress("mc_kshrt_piminus_energy", &e_.mc_kshrt_piminus_energy);
         tree_->SetBranchAddress("mc_kshrt_piminus_px", &e_.mc_kshrt_piminus_px);
         tree_->SetBranchAddress("mc_kshrt_piminus_py", &e_.mc_kshrt_piminus_py);
         tree_->SetBranchAddress("mc_kshrt_piminus_pz", &e_.mc_kshrt_piminus_pz);
+        tree_->SetBranchAddress("mc_kshrt_piminus_startx", &e_.mc_kshrt_piminus_startx);
+        tree_->SetBranchAddress("mc_kshrt_piminus_starty", &e_.mc_kshrt_piminus_starty);
+        tree_->SetBranchAddress("mc_kshrt_piminus_startz", &e_.mc_kshrt_piminus_startz);
+        tree_->SetBranchAddress("mc_kshrt_piminus_endx", &e_.mc_kshrt_piminus_endx);
+        tree_->SetBranchAddress("mc_kshrt_piminus_endy", &e_.mc_kshrt_piminus_endy);
+        tree_->SetBranchAddress("mc_kshrt_piminus_endz", &e_.mc_kshrt_piminus_endz);
 
         tree_->SetBranchAddress("mc_piplus_n_elas", &e_.mc_kshrt_piplus_n_elas);
         tree_->SetBranchAddress("mc_piminus_n_elas", &e_.mc_kshrt_piminus_n_elas);
@@ -133,22 +163,20 @@ private:
         tree_->SetBranchAddress("n_tracks", &e_.n_trks);
         tree_->SetBranchAddress("n_showers", &e_.n_shwrs);
 
-        /*tree_->SetBranchAddress("pfp_generation_v", &e_.pfp_generation);
-        tree_->SetBranchAddress("pfp_trk_daughters_v", &e_.pfp_trk_daughters_count);
-        tree_->SetBranchAddress("pfp_shr_daughters_v", &e_.pfp_shr_daughters_count);
+        set_object_input_branch_address(*tree_, "backtracked_tid", e_.backtracked_tid);
+        set_object_input_branch_address(*tree_, "backtracked_pdg", e_.backtracked_pdg);
+        set_object_input_branch_address(*tree_, "backtracked_purity", e_.backtracked_purity);
+        set_object_input_branch_address(*tree_, "backtracked_completeness", e_.backtracked_completeness); 
+        set_object_input_branch_address(*tree_, "backtracked_overlay_purity", e_.backtracked_overlay_purity);
 
-        tree_->SetBranchAddress("trk_score_v", &e_.pfp_track_score);
-        tree_->SetBranchAddress("pfpdg", &e_.pfp_reco_pdg);
-        tree_->SetBranchAddress("pfnhits", &e_.pfp_hits);
-        tree_->SetBranchAddress("pfnplanehits_U", &e_.pfp_hits_uplane);
-        tree_->SetBranchAddress("pfnplanehits_V", &e_.pfp_hits_vplane);
-        tree_->SetBranchAddress("pfnplanehits_Y", &e_.pfp_hits_yplane);
+        set_object_input_branch_address(*tree_, "pfnhits", e_.pfnhits);
 
-        tree_->SetBranchAddress("backtracked_pdg", &e_.pfp_true_pdg);
-        tree_->SetBranchAddress("backtracked_e", &e_.pfp_true_energy);
-        tree_->SetBranchAddress("backtracked_px", &e_.pfp_true_px);
-        tree_->SetBranchAddress("backtracked_py", &e_.pfp_true_py);
-        tree_->SetBranchAddress("backtracked_pz", &e_.pfp_true_pz);*/
+        set_object_input_branch_address(*tree_, "pfp_muon_purity", e_.pfp_muon_purity);
+        set_object_input_branch_address(*tree_, "pfp_muon_completeness", e_.pfp_muon_completeness);
+        set_object_input_branch_address(*tree_, "pfp_piplus_purity", e_.pfp_piplus_purity);
+        set_object_input_branch_address(*tree_, "pfp_piplus_completeness", e_.pfp_piplus_completeness);
+        set_object_input_branch_address(*tree_, "pfp_piminus_purity", e_.pfp_piminus_purity);
+        set_object_input_branch_address(*tree_, "pfp_piminus_completeness", e_.pfp_piminus_completeness);
     }
 };
 
