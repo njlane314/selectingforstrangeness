@@ -36,3 +36,6 @@ selection_analysis
 
 plots/*
 evtdisp/*
+
+*.png
+*.pdf

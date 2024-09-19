@@ -34,7 +34,7 @@ void muon_analyser()
     for (int i = 0; i < num_events; ++i) {
         const AnalysisEvent& event = event_assembler.get_event(i);
         if (!event.mc_has_muon) continue;
-        if (!event.mc_is_kshort_decay_pionic) continue;
+        //if (!event.mc_is_kshort_decay_pionic) continue;
 
         unsigned int muon_tid = event.mc_muon_tid;
 
@@ -45,8 +45,7 @@ void muon_analyser()
         for (size_t j = 0; j < event.backtracked_tid->size(); ++j) {
             if (event.backtracked_tid->at(j) == muon_tid) {
                 int num_hits = event.pfnhits->at(j);
-                std::cout << event.backtracked_pdg->at(j) << std::endl;
-
+        
                 if (num_hits > max_hits) {
                     max_hits = num_hits;
                     best_match_index = j;

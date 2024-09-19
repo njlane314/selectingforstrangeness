@@ -19,7 +19,7 @@ public:
     SliceAssembler(const std::string& input_name)
     {
         file_ = TFile::Open(input_name.c_str(), "READ");
-        tree_ = dynamic_cast<TTree*>(file_->Get("nuselection/SliceAnalysis"));
+        tree_ = dynamic_cast<TTree*>(file_->Get("emptyselectionfilter/SliceAnalysis"));
 
         num_events_ = tree_->GetEntries();
 

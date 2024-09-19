@@ -35,6 +35,11 @@ struct AnalysisEvent
     int mc_nu_ccnc;
     int mc_nu_interaction_type;
 
+    float mc_nu_W;
+    float mc_nu_X;
+    float mc_nu_Y;
+    float mc_nu_QSqr;
+
     tree_utils::ManagedPointer<std::vector<int>> mc_nu_daughter_pdg;
     tree_utils::ManagedPointer<std::vector<float>> mc_nu_daughter_energy;
     tree_utils::ManagedPointer<std::vector<float>> mc_nu_daughter_px;
@@ -111,6 +116,10 @@ struct AnalysisEvent
     tree_utils::ManagedPointer<std::vector<float>> pfp_piplus_completeness;
     tree_utils::ManagedPointer<std::vector<float>> pfp_piminus_purity;
     tree_utils::ManagedPointer<std::vector<float>> pfp_piminus_completeness;
+
+    tree_utils::ManagedPointer<std::vector<int>> bt_pdg; 
+    tree_utils::ManagedPointer<std::vector<std::vector<unsigned int>>> bt_tids;
+    tree_utils::ManagedPointer<std::vector<float>> bt_energy;
 };
 
 static const std::map<EventCategory, std::string> event_category_to_label_map = {

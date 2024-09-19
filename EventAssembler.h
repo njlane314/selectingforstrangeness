@@ -33,7 +33,7 @@ public:
     EventAssembler(const std::string& input_name)
     {
         file_ = TFile::Open(input_name.c_str(), "READ");
-        tree_ = dynamic_cast<TTree*>(file_->Get("nuselection/StrangenessSelectionFilter"));
+        tree_ = dynamic_cast<TTree*>(file_->Get("emptyselectionfilter/StrangenessSelectionFilter"));
 
         num_events_ = tree_->GetEntries();
 
@@ -62,8 +62,11 @@ public:
         return num_events_; 
     }
 
-    void print_event(const AnalysisEvent& event) const
+    void print_event(int i) const
     {
+        tree_->GetEntry(i);
+
+        std::cout << "Run: " << e_.run << ", Subrun: " << e_.subrun << ", Event: " << e_.event << std::endl;
     }
 
 private:
@@ -88,6 +91,11 @@ private:
         tree_->SetBranchAddress("nu_e", &e_.mc_nu_energy);
         tree_->SetBranchAddress("ccnc", &e_.mc_nu_ccnc);
         tree_->SetBranchAddress("interaction", &e_.mc_nu_interaction_type);
+
+        tree_->SetBranchAddress("W", &e_.mc_nu_W);
+        tree_->SetBranchAddress("X", &e_.mc_nu_X);
+        tree_->SetBranchAddress("Y", &e_.mc_nu_Y);
+        tree_->SetBranchAddress("QSqr", &e_.mc_nu_QSqr);
 
         set_object_input_branch_address(*tree_, "mc_pdg", e_.mc_nu_daughter_pdg);
         set_object_input_branch_address(*tree_, "mc_E", e_.mc_nu_daughter_energy);
@@ -177,6 +185,10 @@ private:
         set_object_input_branch_address(*tree_, "pfp_piplus_completeness", e_.pfp_piplus_completeness);
         set_object_input_branch_address(*tree_, "pfp_piminus_purity", e_.pfp_piminus_purity);
         set_object_input_branch_address(*tree_, "pfp_piminus_completeness", e_.pfp_piminus_completeness);
+
+        set_object_input_branch_address(*tree_, "bt_pdg", e_.bt_pdg);
+        set_object_input_branch_address(*tree_, "bt_tids", e_.bt_tids);
+        set_object_input_branch_address(*tree_, "bt_energy", e_.bt_energy);
     }
 };
 

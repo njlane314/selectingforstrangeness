@@ -30,7 +30,7 @@ public:
     DisplayAssembler(const std::string& input_name) 
     {
         file_ = TFile::Open(input_name.c_str(), "READ");
-        tree_ = dynamic_cast<TTree*>(file_->Get("nuselection/StrangenessSelectionFilter"));
+        tree_ = dynamic_cast<TTree*>(file_->Get("emptyselectionfilter/StrangenessSelectionFilter"));
 
         set_branch_addresses();
     }
@@ -164,27 +164,27 @@ private:
         true_vertex_w->SetMarkerSize(1.2);
 
         // Create TGraphs for each PDG
-        std::map<int, TGraph*> pdgGraphs;
+        std::map<int, TGraph*> pdg_graphs;
         for (size_t i = 0; i < hits_u_wire_->size(); ++i) {
             int pdg = std::abs(hits_u_owner_->at(i));
 
-            if (pdgGraphs.find(pdg) == pdgGraphs.end()) {
-                pdgGraphs[pdg] = new TGraph();
-                pdgGraphs[pdg]->SetMarkerStyle(20);
-                pdgGraphs[pdg]->SetMarkerSize(0.5);
-                pdgGraphs[pdg]->SetMarkerColor(kGray); // Default color
+            if (pdg_graphs.find(pdg) == pdg_graphs.end()) {
+                pdg_graphs[pdg] = new TGraph();
+                pdg_graphs[pdg]->SetMarkerStyle(20);
+                pdg_graphs[pdg]->SetMarkerSize(0.5);
+                pdg_graphs[pdg]->SetMarkerColor(kGray); // Default color
 
-                if (pdg == 13) pdgGraphs[pdg]->SetMarkerColor(kBlue); // Muon
-                else if (pdg == 11) pdgGraphs[pdg]->SetMarkerColor(kRed); // Electron
-                else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
-                else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
-                else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
+                if (pdg == 13) pdg_graphs[pdg]->SetMarkerColor(kBlue); // Muon
+                else if (pdg == 11) pdg_graphs[pdg]->SetMarkerColor(kRed); // Electron
+                else if (pdg == 2212) pdg_graphs[pdg]->SetMarkerColor(kGreen); // Proton
+                else if (pdg == 211) pdg_graphs[pdg]->SetMarkerColor(kPink + 9); // Pion
+                else if (pdg == 22) pdg_graphs[pdg]->SetMarkerColor(kOrange); // Photon
             }
 
-            pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_u_drift_->at(i), hits_u_wire_->at(i));
+            pdg_graphs[pdg]->SetPoint(pdg_graphs[pdg]->GetN(), hits_u_drift_->at(i), hits_u_wire_->at(i));
         }
 
-        for (auto& entry : pdgGraphs) {
+        for (auto& entry : pdg_graphs) {
             mg_u->Add(entry.second);
         }
         mg_u->Add(true_vertex_u);
@@ -195,29 +195,29 @@ private:
         mg_u->GetXaxis()->SetTitleSize(0.05);  
         mg_u->GetYaxis()->SetTitleSize(0.05);
 
-        pdgGraphs.clear(); 
+        pdg_graphs.clear(); 
 
         // Repeat for V view
         for (size_t i = 0; i < hits_v_wire_->size(); ++i) {
             int pdg = std::abs(hits_v_owner_->at(i));
 
-            if (pdgGraphs.find(pdg) == pdgGraphs.end()) {
-                pdgGraphs[pdg] = new TGraph();
-                pdgGraphs[pdg]->SetMarkerStyle(20);
-                pdgGraphs[pdg]->SetMarkerSize(0.5);
-                pdgGraphs[pdg]->SetMarkerColor(kGray); // Default color
+            if (pdg_graphs.find(pdg) == pdg_graphs.end()) {
+                pdg_graphs[pdg] = new TGraph();
+                pdg_graphs[pdg]->SetMarkerStyle(20);
+                pdg_graphs[pdg]->SetMarkerSize(0.5);
+                pdg_graphs[pdg]->SetMarkerColor(kGray); // Default color
 
-                if (pdg == 13) pdgGraphs[pdg]->SetMarkerColor(kBlue); // Muon
-                else if (pdg == 11) pdgGraphs[pdg]->SetMarkerColor(kRed); // Electron
-                else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
-                else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
-                else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
+                if (pdg == 13) pdg_graphs[pdg]->SetMarkerColor(kBlue); // Muon
+                else if (pdg == 11) pdg_graphs[pdg]->SetMarkerColor(kRed); // Electron
+                else if (pdg == 2212) pdg_graphs[pdg]->SetMarkerColor(kGreen); // Proton
+                else if (pdg == 211) pdg_graphs[pdg]->SetMarkerColor(kPink + 9); // Pion
+                else if (pdg == 22) pdg_graphs[pdg]->SetMarkerColor(kOrange); // Photon
             }
 
-            pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_v_drift_->at(i), hits_v_wire_->at(i));
+            pdg_graphs[pdg]->SetPoint(pdg_graphs[pdg]->GetN(), hits_v_drift_->at(i), hits_v_wire_->at(i));
         }
 
-        for (auto& entry : pdgGraphs) {
+        for (auto& entry : pdg_graphs) {
             mg_v->Add(entry.second);
         }
         mg_v->Add(true_vertex_v);
@@ -228,29 +228,29 @@ private:
         mg_v->GetXaxis()->SetTitleSize(0.05);  
         mg_v->GetYaxis()->SetTitleSize(0.05);
 
-        pdgGraphs.clear(); 
+        pdg_graphs.clear(); 
 
         // Repeat for W view
         for (size_t i = 0; i < hits_w_wire_->size(); ++i) {
             int pdg = std::abs(hits_w_owner_->at(i));
 
-            if (pdgGraphs.find(pdg) == pdgGraphs.end()) {
-                pdgGraphs[pdg] = new TGraph();
-                pdgGraphs[pdg]->SetMarkerStyle(20);
-                pdgGraphs[pdg]->SetMarkerSize(0.5);
-                pdgGraphs[pdg]->SetMarkerColor(kGray); // Default color
+            if (pdg_graphs.find(pdg) == pdg_graphs.end()) {
+                pdg_graphs[pdg] = new TGraph();
+                pdg_graphs[pdg]->SetMarkerStyle(20);
+                pdg_graphs[pdg]->SetMarkerSize(0.5);
+                pdg_graphs[pdg]->SetMarkerColor(kGray); // Default color
 
-                if (pdg == 13) pdgGraphs[pdg]->SetMarkerColor(kBlue); // Muon
-                else if (pdg == 11) pdgGraphs[pdg]->SetMarkerColor(kRed); // Electron
-                else if (pdg == 2212) pdgGraphs[pdg]->SetMarkerColor(kGreen); // Proton
-                else if (pdg == 211) pdgGraphs[pdg]->SetMarkerColor(kPink + 9); // Pion
-                else if (pdg == 22) pdgGraphs[pdg]->SetMarkerColor(kOrange); // Photon
+                if (pdg == 13) pdg_graphs[pdg]->SetMarkerColor(kBlue); // Muon
+                else if (pdg == 11) pdg_graphs[pdg]->SetMarkerColor(kRed); // Electron
+                else if (pdg == 2212) pdg_graphs[pdg]->SetMarkerColor(kGreen); // Proton
+                else if (pdg == 211) pdg_graphs[pdg]->SetMarkerColor(kPink + 9); // Pion
+                else if (pdg == 22) pdg_graphs[pdg]->SetMarkerColor(kOrange); // Photon
             }
 
-            pdgGraphs[pdg]->SetPoint(pdgGraphs[pdg]->GetN(), hits_w_drift_->at(i), hits_w_wire_->at(i));
+            pdg_graphs[pdg]->SetPoint(pdg_graphs[pdg]->GetN(), hits_w_drift_->at(i), hits_w_wire_->at(i));
         }
 
-        for (auto& entry : pdgGraphs) {
+        for (auto& entry : pdg_graphs) {
             mg_w->Add(entry.second);
         }
         mg_w->Add(true_vertex_w);
@@ -262,7 +262,7 @@ private:
         mg_w->GetYaxis()->SetTitleSize(0.05);
 
         std::string filename = "true_interaction_hits_" + std::to_string(run_) + "_" + std::to_string(subrun_) + "_" + std::to_string(event_);
-        c4->SaveAs(("./plots/disp/" + filename + ".pdf").c_str());
+        c4->SaveAs(("./plots/" + filename + ".pdf").c_str());
     }
 
     void display_reconstructed_hits() const {
@@ -401,7 +401,7 @@ private:
         reco_mg_w->GetYaxis()->SetTitleSize(0.05);
 
         std::string filename = "reco_interaction_hits_" + std::to_string(run_) + "_" + std::to_string(subrun_) + "_" + std::to_string(event_);
-        c5->SaveAs(("./plots/disp/" + filename + ".pdf").c_str());
+        c5->SaveAs(("./plots/" + filename + ".pdf").c_str());
     }
 };
 

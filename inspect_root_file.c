@@ -1,7 +1,7 @@
 void inspect_root_file() 
 {
     const char* data_dir = getenv("DATA_DIR");
-    std::string file_path = std::string(data_dir) + "/analysis_prod_strange_resample_fhc_run2_fhc_reco2_reco2.root";
+    std::string file_path = std::string(data_dir) + "/prod_strange_resample_fhc_run2_fhc_reco2_reco2_signalfilter_1000_analysis.root";
     const char* file_name = file_path.c_str();
 
     TFile *file = TFile::Open(file_name, "READ");

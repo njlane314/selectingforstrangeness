@@ -15,7 +15,7 @@
 void preselection_analyser()
 {
     const char* data_dir = getenv("DATA_DIR");
-    std::string input_file = std::string(data_dir) + "/analysis_prod_strange_resample_fhc_run2_fhc_reco2_reco2.root";
+    std::string input_file = std::string(data_dir) + "/prod_strange_resample_fhc_run2_fhc_reco2_reco2_signalfilter_1000_analysis.root";
 
     const EventAssembler& event_assembler = EventAssembler::instance(input_file);
     const SliceAssembler& slice_assembler = SliceAssembler::instance(input_file);
@@ -25,48 +25,50 @@ void preselection_analyser()
     int num_events = event_assembler.get_num_events();
 
     // Create histograms for completeness, purity, and other properties
-    TH1D* h_true_completeness = new TH1D("h_true_completeness", ";Completeness;Entries", 10, 0, 1);
-    TH1D* h_pandora_completeness = new TH1D("h_pandora_completeness", ";Completeness;Entries", 10, 0, 1);
-    TH1D* h_flash_completeness = new TH1D("h_flash_completeness", ";Completeness;Entries", 10, 0, 1);
-    TH1D* h_cosmic_completeness = new TH1D("h_cosmic_completeness", ";Completeness;Entries", 10, 0, 1);
+    TH1D* h_true_completeness = new TH1D("h_true_completeness", ";Slice Completeness;Entries/bin", 10, 0, 1);
+    TH1D* h_pandora_completeness = new TH1D("h_pandora_completeness", ";Slice Completeness;Entries/bin", 10, 0, 1);
+    TH1D* h_flash_completeness = new TH1D("h_flash_completeness", ";Slice Completeness;Entries/bin", 10, 0, 1);
+    TH1D* h_cosmic_completeness = new TH1D("h_cosmic_completeness", ";Slice Completeness;Entries/bin", 10, 0, 1);
 
-    TH1D* h_true_purity = new TH1D("h_true_purity", ";Purity;Entries", 10, 0, 1);
-    TH1D* h_pandora_purity = new TH1D("h_pandora_purity", ";Purity;Entries", 10, 0, 1);
-    TH1D* h_flash_purity = new TH1D("h_flash_purity", ";Purity;Entries", 10, 0, 1);
-    TH1D* h_cosmic_purity = new TH1D("h_cosmic_purity", ";Purity;Entries", 10, 0, 1);
+    TH1D* h_true_purity = new TH1D("h_true_purity", ";Purity;Entries/bin", 10, 0, 1);
+    TH1D* h_pandora_purity = new TH1D("h_pandora_purity", ";Purity;Entries/bin", 10, 0, 1);
+    TH1D* h_flash_purity = new TH1D("h_flash_purity", ";Purity;Entries/bin", 10, 0, 1);
+    TH1D* h_cosmic_purity = new TH1D("h_cosmic_purity", ";Purity;Entries/bin", 10, 0, 1);
 
-    TH1D* h_true_topo = new TH1D("h_true_topo", ";Topological Score;Entries", 10, 0, 1);
-    TH1D* h_pandora_topo = new TH1D("h_pandora_topo", ";Topological Score;Entries", 10, 0, 1);
-    TH1D* h_flash_topo = new TH1D("h_flash_topo", ";Topological Score;Entries", 10, 0, 1);
-    TH1D* h_cosmic_topo = new TH1D("h_cosmic_topo", ";Topological Score;Entries", 10, 0, 1);
+    TH1D* h_true_topo = new TH1D("h_true_topo", ";Topological Score;Entries/bin", 10, 0, 1);
+    TH1D* h_pandora_topo = new TH1D("h_pandora_topo", ";Topological Score;Entries/bin", 10, 0, 1);
+    TH1D* h_flash_topo = new TH1D("h_flash_topo", ";Topological Score;Entries/bin", 10, 0, 1);
+    TH1D* h_cosmic_topo = new TH1D("h_cosmic_topo", ";Topological Score;Entries/bin", 10, 0, 1);
 
-    TH1D* h_true_charge = new TH1D("h_true_charge", ";Charge;Entries", 30, 0, 200000);
-    TH1D* h_pandora_charge = new TH1D("h_pandora_charge", ";Charge;Entries", 30, 0, 200000);
-    TH1D* h_flash_charge = new TH1D("h_flash_charge", ";Charge;Entries", 30, 0, 200000);
-    TH1D* h_cosmic_charge = new TH1D("h_cosmic_charge", ";Charge;Entries", 30, 0, 200000);
+    TH1D* h_true_charge = new TH1D("h_true_charge", ";Charge;Entries/bin", 30, 0, 200000);
+    TH1D* h_pandora_charge = new TH1D("h_pandora_charge", ";Charge;Entries/bin", 30, 0, 200000);
+    TH1D* h_flash_charge = new TH1D("h_flash_charge", ";Charge;Entries/bin", 30, 0, 200000);
+    TH1D* h_cosmic_charge = new TH1D("h_cosmic_charge", ";Charge;Entries/bin", 30, 0, 200000);
 
-    TH1D* h_true_center_x = new TH1D("h_true_center_x", ";Center X;Entries", 40, -400, 400);
-    TH1D* h_pandora_center_x = new TH1D("h_pandora_center_x", ";Center X;Entries", 40, -400, 400);
-    TH1D* h_flash_center_x = new TH1D("h_flash_center_x", ";Center X;Entries", 40, -400, 400);
-    TH1D* h_cosmic_center_x = new TH1D("h_cosmic_center_x", ";Center X;Entries", 40, -400, 400);
+    TH1D* h_true_center_x = new TH1D("h_true_center_x", ";Center X;Entries/bin", 40, -400, 400);
+    TH1D* h_pandora_center_x = new TH1D("h_pandora_center_x", ";Center X;Entries/bin", 40, -400, 400);
+    TH1D* h_flash_center_x = new TH1D("h_flash_center_x", ";Center X;Entries/bin", 40, -400, 400);
+    TH1D* h_cosmic_center_x = new TH1D("h_cosmic_center_x", ";Center X;Entries/bin", 40, -400, 400);
 
-    TH1D* h_true_center_y = new TH1D("h_true_center_y", ";Center Y;Entries", 40, -200, 200);
-    TH1D* h_pandora_center_y = new TH1D("h_pandora_center_y", ";Center Y;Entries", 40, -200, 200);
-    TH1D* h_flash_center_y = new TH1D("h_flash_center_y", ";Center Y;Entries", 40, -200, 200);
-    TH1D* h_cosmic_center_y = new TH1D("h_cosmic_center_y", ";Center Y;Entries", 40, -200, 200);
+    TH1D* h_true_center_y = new TH1D("h_true_center_y", ";Center Y;Entries/bin", 40, -200, 200);
+    TH1D* h_pandora_center_y = new TH1D("h_pandora_center_y", ";Center Y;Entries/bin", 40, -200, 200);
+    TH1D* h_flash_center_y = new TH1D("h_flash_center_y", ";Center Y;Entries/bin", 40, -200, 200);
+    TH1D* h_cosmic_center_y = new TH1D("h_cosmic_center_y", ";Center Y;Entries/bin", 40, -200, 200);
 
-    TH1D* h_true_center_z = new TH1D("h_true_center_z", ";Center Z;Entries", 50, -1500, 1500);
-    TH1D* h_pandora_center_z = new TH1D("h_pandora_center_z", ";Center Z;Entries", 50, -1500, 1500);
-    TH1D* h_flash_center_z = new TH1D("h_flash_center_z", ";Center Z;Entries", 50, -1500, 1500);
-    TH1D* h_cosmic_center_z = new TH1D("h_cosmic_center_z", ";Center Z;Entries", 50, -1500, 1500);
+    TH1D* h_true_center_z = new TH1D("h_true_center_z", ";Center Z;Entries/bin", 50, -1500, 1500);
+    TH1D* h_pandora_center_z = new TH1D("h_pandora_center_z", ";Center Z;Entries/bin", 50, -1500, 1500);
+    TH1D* h_flash_center_z = new TH1D("h_flash_center_z", ";Center Z;Entries/bin", 50, -1500, 1500);
+    TH1D* h_cosmic_center_z = new TH1D("h_cosmic_center_z", ";Center Z;Entries/bin", 50, -1500, 1500);
 
-    TH1D* h_true_n_hits = new TH1D("h_true_n_hits", ";Num Hits;Entries", 30, 0, 6000);
-    TH1D* h_pandora_n_hits = new TH1D("h_pandora_n_hits", ";Num Hits;Entries", 30, 0, 6000);
-    TH1D* h_flash_n_hits = new TH1D("h_flash_n_hits", ";Num Hits;Entries", 30, 0, 6000);
-    TH1D* h_cosmic_n_hits = new TH1D("h_cosmic_n_hits", ";Num Hits;Entries", 30, 0, 6000);
+    TH1D* h_true_n_hits = new TH1D("h_true_n_hits", ";Num Hits;Entries/bin", 30, 0, 6000);
+    TH1D* h_pandora_n_hits = new TH1D("h_pandora_n_hits", ";Num Hits;Entries/bin", 30, 0, 6000);
+    TH1D* h_flash_n_hits = new TH1D("h_flash_n_hits", ";Num Hits;Entries/bin", 30, 0, 6000);
+    TH1D* h_cosmic_n_hits = new TH1D("h_cosmic_n_hits", ";Num Hits;Entries/bin", 30, 0, 6000);
 
     TH2D* h_separation_vs_completeness = new TH2D("h_separation_vs_completeness", ";Spatial Separation;Completeness", 50, 0, 500, 50, 0, 1);
     TH2D* h_separation_vs_purity = new TH2D("h_separation_vs_purity", ";Spatial Separation;Purity", 50, 0, 500, 50, 0, 1);
+
+    TH2D* h_decaysep_truecompletenss = new TH2D("", ";True K_{S}^{0} Decay-Distance [cm]; True Slice Completeness", 100, 0, 10, 20, 0, 1);
 
     int sig_count = 0;
     for (int i = 0; i < num_events; ++i)
@@ -91,6 +93,7 @@ void preselection_analyser()
             h_true_center_y->Fill(true_slice["center_y"]);
             h_true_center_z->Fill(true_slice["center_z"]);
             h_true_n_hits->Fill(true_slice["n_hits"]);
+            h_decaysep_truecompletenss->Fill(event.mc_kshrt_end_sep, true_slice["completeness"]);
         }
         if (!pandora_slice.empty()) {
             if (pandora_slice["center_x"] == 0.0 && pandora_slice["center_y"] == 0.0 && pandora_slice["center_z"] == 0.0) {
@@ -240,11 +243,20 @@ void preselection_analyser()
     h_separation_vs_purity->Draw("COLZ");
     c10->SaveAs("./plots/separation_vs_purity_2D.pdf");
 
+    TCanvas* c11 = new TCanvas("c11", "", 800, 600);
+    c11->SetLogx();
+    //h_decaysep_truecompletenss->Scale(1.0 / h_decaysep_truecompletenss->Integral());
+    h_decaysep_truecompletenss->SetStats(0);
+    h_decaysep_truecompletenss->Draw("COLZ");
+    c11->SaveAs("./plots/decaysep_truecompleteness.pdf");
+
     // Cleanup
     delete h_separation_vs_completeness;
     delete h_separation_vs_purity;
+    delete h_decaysep_truecompletenss;
     delete c9;
     delete c10;
+    delete c11;
 
     // Cleanup
     delete h_true_completeness;
