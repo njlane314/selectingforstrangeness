@@ -1,6 +1,4 @@
-import argparse
 import glob
-import hashlib
 import os
 import re
 import shutil
@@ -10,7 +8,23 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-def expand_entities(xml_text: str) -> str:
+CONFIG = "merge-samples.xml"
+
+def _read_text(p):
+    with open(p, "r", encoding="utf-8") as f:
+        return f.read()
+
+def _write_text(p, s):
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(s)
+
+def _abspath(p, base):
+    p = (p or "").strip()
+    if not p:
+        return ""
+    return p if os.path.isabs(p) else os.path.abspath(os.path.join(base, p))
+
+def _expand_entities(xml_text):
     ents = dict(re.findall(r'<!ENTITY\s+(\w+)\s+"([^"]*)"\s*>', xml_text))
     resolved = {}
     def resolve(k, stack=()):
@@ -19,119 +33,162 @@ def expand_entities(xml_text: str) -> str:
         if k not in ents:
             return ""
         if k in stack:
-            raise RuntimeError(f"circular entity: {' -> '.join(stack + (k,))}")
+            raise RuntimeError("circular entity: " + " -> ".join(stack + (k,)))
         v = ents[k]
         v = re.sub(r"&(\w+);", lambda m: resolve(m.group(1), stack + (k,)), v)
         resolved[k] = v
         return v
-    for k in list(ents.keys()):
+    for k in list(ents):
         resolve(k)
     xml_text = re.sub(r"&(\w+);", lambda m: resolved.get(m.group(1), m.group(0)), xml_text)
     xml_text = re.sub(r"<!DOCTYPE[\s\S]*?\]>", "", xml_text, count=1)
     return xml_text
 
-def parse_production_xml(path: str):
-    txt = open(path, "r", encoding="utf-8").read()
-    txt = expand_entities(txt)
+def _parse_production_xml(path):
+    txt = _expand_entities(_read_text(path))
     root = ET.fromstring(txt)
-    proj = root.find("project")
+    proj = root.find("project") or root
+    if proj.tag != "project":
+        proj = root.find(".//project")
     if proj is None:
-        raise RuntimeError("could not find <project> in XML")
-    proj_name = proj.attrib.get("name", "project")
-    stages = []
+        raise RuntimeError("could not find <project> in production XML")
+    project = (proj.attrib.get("name") or "project").strip()
+    stage_outdirs = {}
     for st in proj.findall("stage"):
-        name = st.attrib.get("name", "").strip()
+        name = (st.attrib.get("name") or "").strip()
         outdir = (st.findtext("outdir") or "").strip()
-        inputdef = (st.findtext("inputdef") or "").strip()
         if name and outdir:
-            stages.append({"name": name, "outdir": outdir, "inputdef": inputdef})
-    return proj_name, stages
+            stage_outdirs[name] = outdir
+    if not stage_outdirs:
+        raise RuntimeError("no <stage> entries found in production XML")
+    return project, stage_outdirs
 
-def classify_stage(stage_name: str, inputdef: str) -> str:
-    n = (stage_name or "").lower()
+def _classify(name):
+    n = (name or "").lower()
     if n.startswith("ext"):
         return "ext"
     if n.startswith("dirt"):
         return "dirt"
     if "strange" in n:
         return "strangeness"
-    if n.startswith("data") or " data" in (" " + n + " "):
+    if n.startswith("data"):
         return "data"
     return "beam"
 
-def find_outputs(outdir: str):
-    res = []
-    if not os.path.isdir(outdir):
-        return res
-    for root, _, files in os.walk(outdir):
-        if "nuselection.root" in files:
-            res.append(os.path.join(root, "nuselection.root"))
-    return sorted(set(res))
+def _find_production_xml(cwd):
+    cands = [p for p in sorted(glob.glob(os.path.join(cwd, "*.xml"))) if os.path.basename(p) not in {CONFIG, "merged-samples.xml"}]
+    for p in cands:
+        head = _read_text(p)[:20000]
+        if "<stage" in head and "<project" in head:
+            return p
+    return cands[0] if cands else ""
 
-def run_cmd(cmd):
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if p.returncode != 0:
-        raise RuntimeError(f"command failed ({p.returncode}): {' '.join(cmd)}\n{p.stdout}")
-    return p.stdout
+def _default_numi_db():
+    for p in ("/exp/uboone/data/uboonebeam/beamdb/numi_v2.db", "/exp/uboone/data/uboonebeam/beamdb/numi_v1.db"):
+        if os.path.exists(p):
+            return p
+    return "/exp/uboone/data/uboonebeam/beamdb/numi_v2.db"
 
-def is_pnfs(path: str) -> bool:
-    return path.startswith("/pnfs/")
+def _write_config(cfg_path, prod_xml, project, stage_outdirs):
+    kinds = {}
+    for s in sorted(stage_outdirs):
+        kinds.setdefault(_classify(s), []).append(s)
+    order = [k for k in ("beam", "dirt", "ext", "strangeness", "data") if k in kinds] + [k for k in sorted(kinds) if k not in {"beam","dirt","ext","strangeness","data"}]
+    root = ET.Element("merge_samples")
+    ET.SubElement(root, "production_xml").text = os.path.basename(prod_xml)
+    ET.SubElement(root, "merged_dir").text = "merged"
+    ET.SubElement(root, "output_xml").text = "merged-samples.xml"
+    ET.SubElement(root, "numi_db").text = _default_numi_db()
+    ET.SubElement(root, "subrun_tree").text = "nuselection/SubRun"
+    ET.SubElement(root, "hadd_threads").text = "8"
+    ET.SubElement(root, "chunk_size").text = "250"
+    ET.SubElement(root, "tmp_dir").text = os.environ.get("TMPDIR", "/tmp")
+    groups = ET.SubElement(root, "groups")
+    for k in order:
+        g = ET.SubElement(groups, "group", attrib={"name": k, "kind": k})
+        g.text = ",".join(kinds[k])
+    ET.SubElement(root, "note").text = "Edit merged_dir / output_xml / groups if desired; rerun the script to merge and write normalisation metadata."
+    ET.ElementTree(root).write(cfg_path, encoding="utf-8", xml_declaration=True)
 
-def up_to_date(out: str, inputs):
-    if not os.path.exists(out):
+def _read_config(cfg_path, base):
+    root = ET.parse(cfg_path).getroot()
+    prod_xml = _abspath(root.findtext("production_xml"), base)
+    merged_dir = _abspath(root.findtext("merged_dir") or "merged", base)
+    output_xml = _abspath(root.findtext("output_xml") or "merged-samples.xml", base)
+    numi_db = _abspath(root.findtext("numi_db") or _default_numi_db(), base)
+    subrun_tree = (root.findtext("subrun_tree") or "nuselection/SubRun").strip()
+    hadd_threads = int((root.findtext("hadd_threads") or "8").strip())
+    chunk_size = int((root.findtext("chunk_size") or "250").strip())
+    tmp_dir = _abspath(root.findtext("tmp_dir") or os.environ.get("TMPDIR", "/tmp"), base)
+    groups = []
+    gnode = root.find("groups")
+    if gnode is not None:
+        for g in gnode.findall("group"):
+            name = (g.attrib.get("name") or "").strip()
+            kind = (g.attrib.get("kind") or name).strip()
+            stages = [x.strip() for x in (g.text or "").split(",") if x.strip()]
+            if name and stages:
+                groups.append({"name": name, "kind": kind, "stages": stages})
+    return prod_xml, merged_dir, output_xml, numi_db, subrun_tree, hadd_threads, chunk_size, tmp_dir, groups
+
+def _is_remote(p):
+    return p.startswith("/pnfs/")
+
+def _up_to_date(outp, inputs):
+    if not os.path.exists(outp):
         return False
-    om = os.path.getmtime(out)
-    for x in inputs:
-        try:
-            if os.path.getmtime(x) > om:
-                return False
-        except FileNotFoundError:
+    om = os.path.getmtime(outp)
+    for i in inputs:
+        if not os.path.exists(i) or os.path.getmtime(i) > om:
             return False
     return True
 
-def hadd_merge(dest: str, inputs, hadd_j: int, chunk: int, tmp_root: str, force: bool):
+def _run(cmd):
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("command failed: " + " ".join(cmd) + "\n" + p.stdout)
+    return p.stdout
+
+def _hadd(outp, inputs, threads, workdir):
+    cmd = ["hadd", "-f", "-k"]
+    if threads > 1:
+        cmd += ["-j", str(threads), "-d", os.path.join(workdir, "hadd_tmp")]
+    cmd += [outp] + inputs
+    _run(cmd)
+
+def _merge(dest, inputs, threads, chunk, tmp_dir):
     inputs = [x for x in sorted(set(inputs)) if os.path.exists(x)]
     if not inputs:
-        raise RuntimeError(f"no input files for {dest}")
+        raise RuntimeError("no input files to merge for " + dest)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    if (not force) and up_to_date(dest, inputs):
+    if _up_to_date(dest, inputs):
         return dest
-    work = tempfile.mkdtemp(prefix="merge_", dir=tmp_root)
+    workdir = tempfile.mkdtemp(prefix="merge_", dir=tmp_dir if os.path.isdir(tmp_dir) else None)
     try:
-        def do_hadd(outp: str, ins):
-            cmd = ["hadd", "-f", "-k"]
-            if hadd_j and hadd_j > 1:
-                cmd += ["-j", str(hadd_j), "-d", os.path.join(work, "hadd_tmp")]
-            cmd += [outp] + ins
-            run_cmd(cmd)
+        local = os.path.join(workdir, "merged.root") if _is_remote(dest) else dest
         if len(inputs) == 1:
-            local_out = os.path.join(work, "single.root") if is_pnfs(dest) else dest
-            shutil.copy2(inputs[0], local_out)
+            shutil.copy2(inputs[0], local)
+        elif len(inputs) <= chunk:
+            _hadd(local, inputs, threads, workdir)
         else:
             parts = []
-            chunks = [inputs[i:i+chunk] for i in range(0, len(inputs), chunk)]
-            if len(chunks) == 1:
-                local_out = os.path.join(work, "merged.root") if is_pnfs(dest) else dest
-                do_hadd(local_out, chunks[0])
-            else:
-                for i, ch in enumerate(chunks):
-                    pth = os.path.join(work, f"part_{i:05d}.root")
-                    do_hadd(pth, ch)
-                    parts.append(pth)
-                local_out = os.path.join(work, "merged.root") if is_pnfs(dest) else dest
-                do_hadd(local_out, parts)
-        if is_pnfs(dest):
-            shutil.copy2(local_out, dest)
+            for i in range(0, len(inputs), chunk):
+                part = os.path.join(workdir, f"part_{i//chunk:05d}.root")
+                _hadd(part, inputs[i:i+chunk], threads, workdir)
+                parts.append(part)
+            _hadd(local, parts, threads, workdir)
+        if _is_remote(dest):
+            shutil.copy2(local, dest)
         return dest
     finally:
-        shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(workdir, ignore_errors=True)
 
-def import_root():
+def _import_root():
     import ROOT
     ROOT.gROOT.SetBatch(True)
     return ROOT
 
-def get_tree(f, path: str):
+def _get_tree(f, path):
     t = f.Get(path)
     if t:
         return t
@@ -142,39 +199,27 @@ def get_tree(f, path: str):
             return dd.Get(n)
     return None
 
-def subrun_sum_pot(root_path: str, tree_path: str):
-    ROOT = import_root()
+def _subrun_map(root_path, tree_path):
+    ROOT = _import_root()
     f = ROOT.TFile.Open(root_path)
     if not f or f.IsZombie():
-        raise RuntimeError(f"failed to open ROOT file: {root_path}")
-    t = get_tree(f, tree_path)
+        raise RuntimeError("could not open ROOT file: " + root_path)
+    t = _get_tree(f, tree_path)
     if not t:
         f.Close()
-        raise RuntimeError(f"missing tree {tree_path} in {root_path}")
-    s = 0.0
+        raise RuntimeError("missing tree " + tree_path + " in " + root_path)
+    m = {}
     for e in t:
-        s += float(getattr(e, "pot"))
+        k = (int(getattr(e, "run")), int(getattr(e, "subRun")))
+        v = float(getattr(e, "pot"))
+        if v > m.get(k, float("-inf")):
+            m[k] = v
     f.Close()
-    return s
+    return m
 
-def subrun_pairs(root_path: str, tree_path: str):
-    ROOT = import_root()
-    f = ROOT.TFile.Open(root_path)
-    if not f or f.IsZombie():
-        raise RuntimeError(f"failed to open ROOT file: {root_path}")
-    t = get_tree(f, tree_path)
-    if not t:
-        f.Close()
-        raise RuntimeError(f"missing tree {tree_path} in {root_path}")
-    pairs = set()
-    for e in t:
-        pairs.add((int(getattr(e, "run")), int(getattr(e, "subRun"))))
-    f.Close()
-    return pairs
-
-def query_numi_db(numi_db: str, pairs):
+def _query_numi_db(numi_db, pairs):
     if not os.path.exists(numi_db):
-        raise RuntimeError(f"numi DB not found: {numi_db}")
+        raise RuntimeError("NuMI DB not found: " + numi_db)
     con = sqlite3.connect(numi_db)
     cur = con.cursor()
     cur.execute("PRAGMA table_info(numi);")
@@ -185,28 +230,27 @@ def query_numi_db(numi_db: str, pairs):
     cur.executemany("INSERT OR IGNORE INTO rset(run,subrun) VALUES (?,?);", list(pairs))
     sql = f"""
     WITH dedup AS (
-      SELECT run, subrun,
-             MAX({ea9_col}) AS ea9,
-             MAX({tortgt_col}) AS tortgt
+      SELECT run, subrun, MAX({ea9_col}) AS ea9, MAX({tortgt_col}) AS tortgt
       FROM numi
       GROUP BY run, subrun
     )
     SELECT
       IFNULL(SUM(d.tortgt)*1e12, 0.0) AS tortgt_sum,
-      IFNULL(SUM(d.ea9), 0.0) AS ea9_sum
+      IFNULL(SUM(d.ea9), 0.0)         AS ea9_sum,
+      COUNT(*)                        AS matched
     FROM dedup d
     JOIN rset r USING(run, subrun);
     """
     cur.execute(sql)
-    tortgt_sum, ea9_sum = cur.fetchone()
+    tortgt_sum, ea9_sum, matched = cur.fetchone()
     con.close()
-    return float(tortgt_sum), float(ea9_sum), tortgt_col, ea9_col
+    return float(tortgt_sum), float(ea9_sum), int(matched), tortgt_col, ea9_col
 
-def write_root_meta(root_path: str, numbers: dict, strings: dict):
-    ROOT = import_root()
+def _write_root_meta(root_path, numbers, strings):
+    ROOT = _import_root()
     f = ROOT.TFile.Open(root_path, "UPDATE")
     if not f or f.IsZombie():
-        raise RuntimeError(f"failed to open ROOT file for update: {root_path}")
+        raise RuntimeError("could not open ROOT file for update: " + root_path)
     for k, v in numbers.items():
         p = ROOT.TParameter("double")(str(k), float(v))
         p.Write(str(k), ROOT.TObject.kOverwrite)
@@ -215,193 +259,129 @@ def write_root_meta(root_path: str, numbers: dict, strings: dict):
         n.Write(str(k), ROOT.TObject.kOverwrite)
     f.Close()
 
-def normalize_path(p: str) -> str:
-    return os.path.abspath(os.path.expanduser(p))
+def _find_inputs(outdir):
+    res = []
+    if not os.path.isdir(outdir):
+        return res
+    for root, _, files in os.walk(outdir):
+        if "nuselection.root" in files:
+            res.append(os.path.join(root, "nuselection.root"))
+    return sorted(set(res))
 
-def default_numi_db():
-    cands = [
-        "/exp/uboone/data/uboonebeam/beamdb/numi_v2.db",
-        "/exp/uboone/data/uboonebeam/beamdb/numi_v1.db",
-    ]
-    for c in cands:
-        if os.path.exists(c):
-            return c
-    return cands[0]
-
-def collect_pairs_from_data_arg(data_arg: str, tree_path: str):
-    if not data_arg:
-        return set()
-    p = normalize_path(data_arg)
-    files = []
-    if os.path.isfile(p) and p.endswith(".root"):
-        files = [p]
-    elif os.path.isdir(p):
-        files = []
-        for root, _, fn in os.walk(p):
-            if "nuselection.root" in fn:
-                files.append(os.path.join(root, "nuselection.root"))
-        if not files:
-            files = glob.glob(os.path.join(p, "**", "*.root"), recursive=True)
-    else:
-        files = glob.glob(data_arg, recursive=True)
-    pairs = set()
-    for f in sorted(set(files)):
-        try:
-            pairs |= subrun_pairs(f, tree_path)
-        except Exception:
-            continue
-    return pairs
-
-def build_output_xml(path: str, source_xml: str, project: str, numi_db: str, tortgt_col: str, ea9_col: str, data_tortgt: float, data_ea9: float, stages, groups):
-    root = ET.Element("merged_project", attrib={"source": source_xml, "name": project})
-    data = ET.SubElement(root, "data_exposure", attrib={
+def _write_output_xml(path, production_xml, project, merged_dir, numi_db, tree_path, samples):
+    root = ET.Element("merged_samples", attrib={
+        "production_xml": production_xml,
+        "project": project,
+        "merged_dir": merged_dir,
         "numi_db": numi_db,
-        "tortgt_column": tortgt_col,
-        "ea9cnt_column": ea9_col,
-        "tortgt_sum": f"{data_tortgt:.17g}",
-        "ea9cnt_sum": f"{data_ea9:.17g}",
+        "subrun_tree": tree_path,
     })
-    ET.SubElement(data, "note").text = "tortgt is reported in POT (db value * 1e12); ea9cnt is reported as counts"
-    st_el = ET.SubElement(root, "stages")
-    for s in stages:
-        ET.SubElement(st_el, "stage", attrib={
+    for s in samples:
+        ET.SubElement(root, "sample", attrib={
             "name": s["name"],
             "kind": s["kind"],
-            "inputdef": s.get("inputdef", ""),
-            "outdir": s.get("outdir", ""),
-            "merged": s.get("merged", ""),
-            "pot_or_ntrig_sum": f"{s.get('sum_exposure', 0.0):.17g}",
-            "scale_to_data": f"{s.get('scale', 0.0):.17g}" if s.get("scale") is not None else "",
-            "group": s.get("group", ""),
+            "file": s["file"],
+            "subruns_total": str(s["subruns_total"]),
+            "subruns_matched": str(s["subruns_matched"]),
+            "pot_sum": f"{s['pot_sum']:.17g}",
+            "numi_tortgt_sum": f"{s['tortgt_sum']:.17g}",
+            "numi_ea9cnt_sum": f"{s['ea9_sum']:.17g}",
+            "scale_to_data": f"{s['scale']:.17g}",
+            "normalisation": s["normalisation"],
         })
-    gp_el = ET.SubElement(root, "groups")
-    for g in groups:
-        ET.SubElement(gp_el, "group", attrib={
-            "name": g["name"],
-            "kind": g["kind"],
-            "merged": g.get("merged", ""),
-            "pot_or_ntrig_sum": f"{g.get('sum_exposure', 0.0):.17g}",
-            "scale_to_data": f"{g.get('scale', 0.0):.17g}",
-            "components": ",".join(g.get("components", [])),
-        })
-    tree = ET.ElementTree(root)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tree.write(path, encoding="utf-8", xml_declaration=True)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("production_xml")
-    ap.add_argument("merged_dir")
-    ap.add_argument("output_xml")
-    ap.add_argument("--numi-db", default=default_numi_db())
-    ap.add_argument("--data", default="")
-    ap.add_argument("--subrun-tree", default="nuselection/SubRun")
-    ap.add_argument("--hadd-j", type=int, default=max(1, (os.cpu_count() or 8) // 2))
-    ap.add_argument("--chunk", type=int, default=250)
-    ap.add_argument("--tmp", default=os.environ.get("TMPDIR", "/tmp"))
-    ap.add_argument("--force", action="store_true")
-    args = ap.parse_args()
+    base = os.getcwd()
+    cfg_path = os.path.join(base, CONFIG)
+    if not os.path.exists(cfg_path):
+        prod = _find_production_xml(base)
+        if not prod:
+            raise RuntimeError("No production XML found; place it beside this script and rerun.")
+        project, stage_outdirs = _parse_production_xml(prod)
+        _write_config(cfg_path, prod, project, stage_outdirs)
+        print(f"Created {CONFIG} from {os.path.basename(prod)}. Edit it if desired, then rerun.")
+        return
 
-    prod_xml = normalize_path(args.production_xml)
-    merged_dir = normalize_path(args.merged_dir)
-    out_xml = normalize_path(args.output_xml)
-    numi_db = normalize_path(args.numi_db)
-    tmp_root = normalize_path(args.tmp)
+    prod_xml, merged_dir, output_xml, numi_db, tree_path, threads, chunk, tmp_dir, groups = _read_config(cfg_path, base)
+    if not prod_xml or not os.path.exists(prod_xml):
+        raise RuntimeError("production_xml in merge-samples.xml does not exist")
+    if not groups:
+        raise RuntimeError("No <group> entries in merge-samples.xml")
 
-    project, stages = parse_production_xml(prod_xml)
-    for s in stages:
-        s["kind"] = classify_stage(s["name"], s.get("inputdef", ""))
-        s["files"] = find_outputs(s["outdir"])
+    project, stage_outdirs = _parse_production_xml(prod_xml)
+    out_project_dir = os.path.join(merged_dir, project)
+    os.makedirs(out_project_dir, exist_ok=True)
 
-    stages = [s for s in stages if s["files"]]
-    if not stages:
-        raise RuntimeError("no stages with output ROOT files were found")
-
-    proj_dir = os.path.join(merged_dir, project)
-    os.makedirs(proj_dir, exist_ok=True)
-
-    for s in stages:
-        s["merged"] = os.path.join(proj_dir, f"{s['name']}.root")
-        hadd_merge(s["merged"], s["files"], args.hadd_j, args.chunk, tmp_root, args.force)
-        s["sum_exposure"] = subrun_sum_pot(s["merged"], args.subrun_tree)
-
-    data_stages = [s for s in stages if s["kind"] == "data"]
-    data_pairs = set()
-    for s in data_stages:
-        data_pairs |= subrun_pairs(s["merged"], args.subrun_tree)
-    if not data_pairs:
-        data_pairs = collect_pairs_from_data_arg(args.data, args.subrun_tree)
-    if not data_pairs:
-        raise RuntimeError("no data run/subRun pairs found; provide --data pointing to a merged data ROOT file (or a directory/glob of data outputs)")
-
-    data_tortgt, data_ea9, tortgt_col, ea9_col = query_numi_db(numi_db, data_pairs)
-
-    groups = {}
-    for s in stages:
-        groups.setdefault(s["kind"], []).append(s)
-
-    group_outputs = []
-    for kind, ss in sorted(groups.items(), key=lambda kv: kv[0]):
-        comp = sorted([x["name"] for x in ss])
-        sum_exposure = float(sum(x["sum_exposure"] for x in ss))
+    results = []
+    for g in groups:
+        name, kind, stages = g["name"], g["kind"], g["stages"]
+        out = os.path.join(out_project_dir, f"{name}.root")
+        inputs = []
+        missing = [s for s in stages if s not in stage_outdirs]
+        if missing:
+            raise RuntimeError("Stages not found in production XML: " + ", ".join(missing))
+        for s in stages:
+            inputs.extend(_find_inputs(stage_outdirs[s]))
+        inputs = sorted(set(inputs))
+        if not inputs:
+            print(f"Skipping {name}: no input files found.")
+            continue
+        print(f"Merging {name} ({kind}): {len(inputs)} files")
+        _merge(out, inputs, threads, chunk, tmp_dir)
+        m = _subrun_map(out, tree_path)
+        pot_sum = float(sum(m.values()))
+        pairs = list(m.keys())
+        tortgt_sum, ea9_sum, matched, tortgt_col, ea9_col = _query_numi_db(numi_db, pairs)
         if kind == "ext":
-            scale = (data_ea9 / sum_exposure) if sum_exposure > 0 else 0.0
-            scale_kind = "ea9cnt_over_ntrig"
+            scale = ea9_sum / pot_sum if pot_sum > 0 else 0.0
+            normalisation = f"{ea9_col}/pot"
         elif kind == "data":
             scale = 1.0
-            scale_kind = "unity"
+            normalisation = "unity"
         else:
-            scale = (data_tortgt / sum_exposure) if sum_exposure > 0 else 0.0
-            scale_kind = "tortgt_over_potmc"
-        if len(ss) > 1:
-            gfile = os.path.join(proj_dir, f"{kind}.root")
-            hadd_merge(gfile, [x["merged"] for x in ss], args.hadd_j, args.chunk, tmp_root, args.force)
-        else:
-            gfile = ss[0]["merged"]
-        write_root_meta(
-            gfile,
+            scale = tortgt_sum / pot_sum if pot_sum > 0 else 0.0
+            normalisation = f"{tortgt_col}/pot"
+        _write_root_meta(
+            out,
             {
-                "exposure_sum": sum_exposure,
-                "data_tortgt_sum": data_tortgt,
-                "data_ea9cnt_sum": data_ea9,
+                "pot_sum": pot_sum,
+                "numi_tortgt_sum": tortgt_sum,
+                "numi_ea9cnt_sum": ea9_sum,
                 "scale_to_data": scale,
+                "subruns_total": float(len(pairs)),
+                "subruns_matched": float(matched),
             },
             {
+                "sample_name": name,
                 "sample_kind": kind,
-                "sample_group": kind,
-                "scale_kind": scale_kind,
+                "normalisation": normalisation,
+                "production_xml": prod_xml,
+                "merge_config": cfg_path,
                 "numi_db": numi_db,
                 "numi_tortgt_column": tortgt_col,
                 "numi_ea9cnt_column": ea9_col,
-                "project": project,
+                "subrun_tree": tree_path,
             },
         )
-        for s in ss:
-            s["group"] = kind
-            s["scale"] = scale
-            write_root_meta(
-                s["merged"],
-                {
-                    "exposure_sum": float(s["sum_exposure"]),
-                    "group_exposure_sum": sum_exposure,
-                    "data_tortgt_sum": data_tortgt,
-                    "data_ea9cnt_sum": data_ea9,
-                    "scale_to_data": scale,
-                },
-                {
-                    "sample_kind": kind,
-                    "sample_group": kind,
-                    "sample_stage": s["name"],
-                    "scale_kind": scale_kind,
-                    "numi_db": numi_db,
-                    "numi_tortgt_column": tortgt_col,
-                    "numi_ea9cnt_column": ea9_col,
-                    "project": project,
-                },
-            )
-        group_outputs.append({"name": kind, "kind": kind, "merged": gfile, "sum_exposure": sum_exposure, "scale": scale, "components": comp})
+        if matched != len(pairs):
+            print(f"Warning: {name}: matched {matched}/{len(pairs)} subruns in the NuMI DB")
+        results.append({
+            "name": name,
+            "kind": kind,
+            "file": out,
+            "subruns_total": len(pairs),
+            "subruns_matched": matched,
+            "pot_sum": pot_sum,
+            "tortgt_sum": tortgt_sum,
+            "ea9_sum": ea9_sum,
+            "scale": scale,
+            "normalisation": normalisation,
+        })
 
-    build_output_xml(out_xml, prod_xml, project, numi_db, tortgt_col, ea9_col, data_tortgt, data_ea9, stages, group_outputs)
+    _write_output_xml(output_xml, prod_xml, project, merged_dir, numi_db, tree_path, results)
+    print(f"Wrote {output_xml}")
 
 if __name__ == "__main__":
     try:
