@@ -132,36 +132,24 @@ def _read_cfg(cfg, base):
     return prod, merged, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups
 
 def _run(cmd):
-    master_fd, slave_fd = pty.openpty()
-    p = subprocess.Popen(cmd, stdout=slave_fd, stderr=slave_fd)
-    os.close(slave_fd)
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+    )
 
     captured = bytearray()
+    assert p.stdout is not None
     try:
-        while True:
-            r, _, _ = select.select([master_fd], [], [], 0.2)
-            if master_fd in r:
-                data = os.read(master_fd, 8192)
-                if not data:
-                    break
-                sys.stdout.buffer.write(data)
-                sys.stdout.buffer.flush()
-                captured += data
-            if p.poll() is not None:
-                break
-
-        while True:
-            try:
-                data = os.read(master_fd, 8192)
-            except OSError:
-                break
+        for data in iter(lambda: p.stdout.read(8192), b""):
             if not data:
                 break
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
             captured += data
     finally:
-        os.close(master_fd)
+        p.stdout.close()
 
     rc = p.wait()
     if rc != 0:
