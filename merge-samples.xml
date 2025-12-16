@@ -2,13 +2,10 @@
 <merge_samples>
   <production_xml>numi_fhc_run1.xml</production_xml>
 
-  <reference_root>/pnfs/uboone/scratch/users/nlane/your_data_merged.root</reference_root>
-
   <merged_dir>merged</merged_dir>
   <output_xml>merged-samples.xml</output_xml>
 
   <run_db>/exp/uboone/data/uboonebeam/beamdb/run.db</run_db>
-  <numi_db>/exp/uboone/data/uboonebeam/beamdb/numi_v3.db</numi_db>
   <toroid_scale>1e12</toroid_scale>
 
   <subrun_tree>nuselection/SubRun</subrun_tree>
