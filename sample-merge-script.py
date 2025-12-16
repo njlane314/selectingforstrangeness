@@ -166,54 +166,69 @@ def _uptodate(outp, inputs):
     om = os.path.getmtime(outp)
     return all(os.path.exists(i) and os.path.getmtime(i) <= om for i in inputs)
 
-def _hadd(outp, inputs, threads, work):
-    cmd = ["hadd", "-f", "-k", "-v"]
+def _pnfs_to_xrootd(p):
+    if not _is_pnfs(p):
+        return p
+    try:
+        r = subprocess.run(["pnfs2xrootd", p], check=False, capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:
+        pass
+    suffix = p
+    if not suffix.startswith("/pnfs/fnal.gov"):
+        suffix = "/pnfs/fnal.gov" + p[len("/pnfs"):]
+    return f"root://fndca1.fnal.gov:1094{suffix}"
+
+def _hadd(outp, inputs, threads, work, max_open):
+    os.makedirs(work, exist_ok=True)
+    list_path = os.path.join(work, "inputs.txt")
+    with open(list_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(inputs))
+
+    cmd = ["hadd", "-f", "-k", "-v0"]
     if threads > 1:
         d = os.path.join(work, "hadd_tmp")
         os.makedirs(d, exist_ok=True)
         cmd += ["-j", str(threads), "-d", d]
-    cmd += [outp] + inputs
+    if max_open and max_open > 0:
+        cmd += [f"-n{max_open}"]
+    cmd += [outp, f"@{list_path}"]
     _run(cmd)
 
 def _merge(dest, inputs, threads, chunk, tmp):
-    inputs = [x for x in sorted(set(inputs)) if os.path.exists(x)]
+    inputs = sorted(set(inputs))
     if not inputs:
         raise RuntimeError("no input files for " + dest)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     if _uptodate(dest, inputs):
-        return dest
+        return dest, lambda: None
+
     work = tempfile.mkdtemp(prefix="merge_", dir=tmp if os.path.isdir(tmp) else None)
+    cleanup = lambda: shutil.rmtree(work, ignore_errors=True)
+    local = os.path.join(work, "merged.root") if _is_pnfs(dest) else dest
     try:
-        local = os.path.join(work, "merged.root") if _is_pnfs(dest) else dest
         if len(inputs) == 1:
             shutil.copy2(inputs[0], local)
-        elif len(inputs) <= chunk:
-            _hadd(local, inputs, threads, work)
         else:
-            parts = []
-            n = len(inputs)
-            nparts = (n + chunk - 1) // chunk
-            print(f"  -> splitting into {nparts} chunks of up to {chunk} files", flush=True)
-
-            for ci, i in enumerate(range(0, n, chunk), start=1):
-                print(f"  -> chunk {ci}/{nparts}: {min(chunk, n - i)} files", flush=True)
-                part = os.path.join(work, f"part_{i//chunk:05d}.root")
-                _hadd(part, inputs[i:i+chunk], threads, work)
-                parts.append(part)
-            _hadd(local, parts, threads, work)
-        if _is_pnfs(dest):
-            shutil.copy2(local, dest)
-        return dest
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
+            hadd_inputs = [_pnfs_to_xrootd(p) for p in inputs]
+            _hadd(local, hadd_inputs, threads, work, chunk)
+        return local, cleanup
+    except Exception:
+        cleanup()
+        raise
 
 def _inputs_from_outdir(outdir):
     res = []
     if not os.path.isdir(outdir):
         return res
-    for root, _, files in os.walk(outdir):
-        if "nu_selection.root" in files:
-            res.append(os.path.join(root, "nu_selection.root"))
+    with os.scandir(outdir) as it:
+        for e in it:
+            if not e.is_dir():
+                continue
+            p = os.path.join(e.path, "nu_selection.root")
+            if os.path.isfile(p):
+                res.append(p)
     return sorted(set(res))
 
 def _keys_and_pot(root_path, tree_path):
@@ -374,75 +389,81 @@ def main():
             continue
 
         print(f"Merging {name} ({kind}): {len(ins)} files")
-        _merge(out, ins, threads, chunk, tmp)
+        merged, cleanup = _merge(out, ins, threads, chunk, tmp)
 
-        keys, pot_sum = _keys_and_pot(out, tree)
-        pairs = _pairs_from_keys(keys)
+        try:
+            keys, pot_sum = _keys_and_pot(merged, tree)
+            pairs = _pairs_from_keys(keys)
 
-        ea9_sum, tort_raw, ext_raw, matched, ea9c, tortc, extc, ext_by_run = _runinfo_sums(run_db, pairs)
-        tort_pot = float(tort_raw) * float(tor_scale)
+            ea9_sum, tort_raw, ext_raw, matched, ea9c, tortc, extc, ext_by_run = _runinfo_sums(run_db, pairs)
+            tort_pot = float(tort_raw) * float(tor_scale)
 
-        ext_prescaled = float(_ext_prescaled(ext_by_run))
-        ext_pot_equiv = 0.0
+            ext_prescaled = float(_ext_prescaled(ext_by_run))
+            ext_pot_equiv = 0.0
 
-        if kind == "ext":
-            scale_to_data = (ea9_sum / ext_prescaled) if ext_prescaled > 0 else 0.0
-            ext_pot_equiv = tort_pot * scale_to_data if ext_prescaled > 0 else 0.0
-            normalisation = f"{ea9c}/{extc}_prescaled"
-        elif kind == "data":
-            scale_to_data = 1.0
-            normalisation = "unity"
-        else:
-            scale_to_data = (tort_pot / pot_sum) if pot_sum > 0 else 0.0
-            normalisation = f"{tortc}*toroid_scale/pot"
+            if kind == "ext":
+                scale_to_data = (ea9_sum / ext_prescaled) if ext_prescaled > 0 else 0.0
+                ext_pot_equiv = tort_pot * scale_to_data if ext_prescaled > 0 else 0.0
+                normalisation = f"{ea9c}/{extc}_prescaled"
+            elif kind == "data":
+                scale_to_data = 1.0
+                normalisation = "unity"
+            else:
+                scale_to_data = (tort_pot / pot_sum) if pot_sum > 0 else 0.0
+                normalisation = f"{tortc}*toroid_scale/pot"
 
-        _write_meta(
-            out,
-            {
-                "pot_sum": pot_sum,
-                "runinfo_ea9_sum": ea9_sum,
-                "runinfo_tortgt_raw": tort_raw,
-                "runinfo_tortgt_pot": tort_pot,
-                "runinfo_exttrig_raw": ext_raw,
-                "exttrig_prescaled": ext_prescaled,
-                "ext_pot_equiv": ext_pot_equiv,
-                "toroid_scale": tor_scale,
-                "scale_to_data": scale_to_data,
-                "subruns_total": float(len(pairs)),
-                "runinfo_subruns_matched": float(matched),
-            },
-            {
-                "sample_name": name,
-                "sample_kind": kind,
+            _write_meta(
+                merged,
+                {
+                    "pot_sum": pot_sum,
+                    "runinfo_ea9_sum": ea9_sum,
+                    "runinfo_tortgt_raw": tort_raw,
+                    "runinfo_tortgt_pot": tort_pot,
+                    "runinfo_exttrig_raw": ext_raw,
+                    "exttrig_prescaled": ext_prescaled,
+                    "ext_pot_equiv": ext_pot_equiv,
+                    "toroid_scale": tor_scale,
+                    "scale_to_data": scale_to_data,
+                    "subruns_total": float(len(pairs)),
+                    "runinfo_subruns_matched": float(matched),
+                },
+                {
+                    "sample_name": name,
+                    "sample_kind": kind,
+                    "normalisation": normalisation,
+                    "production_xml": prod,
+                    "merge_config": cfg,
+                    "run_db": run_db,
+                    "ea9_column": ea9c,
+                    "tortgt_column": tortc,
+                    "exttrig_column": extc,
+                    "subrun_tree": tree,
+                    "prescale_applied": "yes" if _CONFDB is not None else "no",
+                },
+            )
+
+            if _is_pnfs(out) and merged != out:
+                shutil.copy2(merged, out)
+
+            if matched != len(pairs):
+                print(f"Warning: {name}: matched {matched}/{len(pairs)} subruns in runinfo")
+
+            samples.append({
+                "name": name,
+                "kind": kind,
+                "file": out,
+                "subruns_total": len(pairs),
+                "pot_sum": f"{pot_sum:.17g}",
+                "runinfo_ea9_sum": f"{ea9_sum:.17g}",
+                "runinfo_tortgt_pot": f"{tort_pot:.17g}",
+                "scale_to_data": f"{scale_to_data:.17g}",
                 "normalisation": normalisation,
-                "production_xml": prod,
-                "merge_config": cfg,
-                "run_db": run_db,
-                "ea9_column": ea9c,
-                "tortgt_column": tortc,
-                "exttrig_column": extc,
-                "subrun_tree": tree,
-                "prescale_applied": "yes" if _CONFDB is not None else "no",
-            },
-        )
-
-        if matched != len(pairs):
-            print(f"Warning: {name}: matched {matched}/{len(pairs)} subruns in runinfo")
-
-        samples.append({
-            "name": name,
-            "kind": kind,
-            "file": out,
-            "subruns_total": len(pairs),
-            "pot_sum": f"{pot_sum:.17g}",
-            "runinfo_ea9_sum": f"{ea9_sum:.17g}",
-            "runinfo_tortgt_pot": f"{tort_pot:.17g}",
-            "scale_to_data": f"{scale_to_data:.17g}",
-            "normalisation": normalisation,
-            "exttrig_raw": f"{ext_raw:.17g}",
-            "exttrig_prescaled": f"{ext_prescaled:.17g}",
-            "ext_pot_equiv": f"{ext_pot_equiv:.17g}",
-        })
+                "exttrig_raw": f"{ext_raw:.17g}",
+                "exttrig_prescaled": f"{ext_prescaled:.17g}",
+                "ext_pot_equiv": f"{ext_pot_equiv:.17g}",
+            })
+        finally:
+            cleanup()
 
     _write_outxml(outxml, prod, project, merged_dir, run_db, tree, samples)
     print(f"Wrote {outxml}")
