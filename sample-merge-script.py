@@ -145,7 +145,9 @@ def _uptodate(outp, inputs):
 def _hadd(outp, inputs, threads, work):
     cmd = ["hadd", "-f", "-k"]
     if threads > 1:
-        cmd += ["-j", str(threads), "-d", os.path.join(work, "hadd_tmp")]
+        d = os.path.join(work, "hadd_tmp")
+        os.makedirs(d, exist_ok=True)
+        cmd += ["-j", str(threads), "-d", d]
     cmd += [outp] + inputs
     _run(cmd)
 
