@@ -1,7 +1,9 @@
 import glob
 import os
 import os.path
+import pty
 import re
+import select
 import shutil
 import sqlite3
 import subprocess
@@ -130,9 +132,42 @@ def _read_cfg(cfg, base):
     return prod, merged, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups
 
 def _run(cmd):
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if p.returncode != 0:
-        raise RuntimeError("command failed: " + " ".join(cmd) + "\n" + p.stdout)
+    master_fd, slave_fd = pty.openpty()
+    p = subprocess.Popen(cmd, stdout=slave_fd, stderr=slave_fd)
+    os.close(slave_fd)
+
+    captured = bytearray()
+    try:
+        while True:
+            r, _, _ = select.select([master_fd], [], [], 0.2)
+            if master_fd in r:
+                data = os.read(master_fd, 8192)
+                if not data:
+                    break
+                sys.stdout.buffer.write(data)
+                sys.stdout.buffer.flush()
+                captured += data
+            if p.poll() is not None:
+                break
+
+        while True:
+            try:
+                data = os.read(master_fd, 8192)
+            except OSError:
+                break
+            if not data:
+                break
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+            captured += data
+    finally:
+        os.close(master_fd)
+
+    rc = p.wait()
+    if rc != 0:
+        raise RuntimeError(
+            "command failed: " + " ".join(cmd) + "\n" + captured.decode("utf-8", "replace")
+        )
 
 def _is_pnfs(p):
     return p.startswith("/pnfs/")
@@ -144,7 +179,7 @@ def _uptodate(outp, inputs):
     return all(os.path.exists(i) and os.path.getmtime(i) <= om for i in inputs)
 
 def _hadd(outp, inputs, threads, work):
-    cmd = ["hadd", "-f", "-k"]
+    cmd = ["hadd", "-f", "-k", "-v"]
     if threads > 1:
         d = os.path.join(work, "hadd_tmp")
         os.makedirs(d, exist_ok=True)
@@ -168,7 +203,12 @@ def _merge(dest, inputs, threads, chunk, tmp):
             _hadd(local, inputs, threads, work)
         else:
             parts = []
-            for i in range(0, len(inputs), chunk):
+            n = len(inputs)
+            nparts = (n + chunk - 1) // chunk
+            print(f"  -> splitting into {nparts} chunks of up to {chunk} files", flush=True)
+
+            for ci, i in enumerate(range(0, n, chunk), start=1):
+                print(f"  -> chunk {ci}/{nparts}: {min(chunk, n - i)} files", flush=True)
                 part = os.path.join(work, f"part_{i//chunk:05d}.root")
                 _hadd(part, inputs[i:i+chunk], threads, work)
                 parts.append(part)
