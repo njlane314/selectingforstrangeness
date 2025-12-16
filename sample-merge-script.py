@@ -181,8 +181,8 @@ def _inputs_from_outdir(outdir):
     if not os.path.isdir(outdir):
         return res
     for root, _, files in os.walk(outdir):
-        if "nuselection.root" in files:
-            res.append(os.path.join(root, "nuselection.root"))
+        if "nu_selection.root" in files:
+            res.append(os.path.join(root, "nu_selection.root"))
     return sorted(set(res))
 
 def _keys_and_pot(root_path, tree_path):
