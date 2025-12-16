@@ -2,7 +2,7 @@
 <merge_samples>
   <production_xml>numi_fhc_run1.xml</production_xml>
 
-  <merged_dir>merged</merged_dir>
+  <merged_dir>/pnfs/uboone/scratch/users/nlane/merged_samples</merged_dir>
   <output_xml>merged-samples.xml</output_xml>
 
   <run_db>/exp/uboone/data/uboonebeam/beamdb/run.db</run_db>
