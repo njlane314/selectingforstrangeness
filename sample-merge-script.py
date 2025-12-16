@@ -169,31 +169,37 @@ def _uptodate(outp, inputs):
 def _pnfs_to_xrootd(p):
     if not _is_pnfs(p):
         return p
+
+    try:
+        if os.path.isfile(p) and os.access(p, os.R_OK):
+            return p
+    except Exception:
+        pass
+
     try:
         r = subprocess.run(["pnfs2xrootd", p], check=False, capture_output=True, text=True)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip()
     except Exception:
         pass
+
     suffix = p
     if not suffix.startswith("/pnfs/fnal.gov"):
         suffix = "/pnfs/fnal.gov" + p[len("/pnfs"):]
     return f"root://fndca1.fnal.gov:1094{suffix}"
 
-def _hadd(outp, inputs, threads, work, max_open):
-    os.makedirs(work, exist_ok=True)
-    list_path = os.path.join(work, "inputs.txt")
-    with open(list_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(inputs))
+def _hadd(outp, inputs, threads, work):
+    if not inputs:
+        raise RuntimeError("hadd called with no inputs")
 
-    cmd = ["hadd", "-f", "-k", "-v0"]
-    if threads > 1:
-        d = os.path.join(work, "hadd_tmp")
+    cmd = ["hadd", "-f", "-k"]
+
+    if threads and threads > 1:
+        d = os.path.join(work, "hadd_tmp", os.path.basename(outp).replace(".root", ""))
         os.makedirs(d, exist_ok=True)
         cmd += ["-j", str(threads), "-d", d]
-    if max_open and max_open > 0:
-        cmd += [f"-n{max_open}"]
-    cmd += [outp, f"@{list_path}"]
+
+    cmd += [outp] + list(inputs)
     _run(cmd)
 
 def _merge(dest, inputs, threads, chunk, tmp):
@@ -212,7 +218,18 @@ def _merge(dest, inputs, threads, chunk, tmp):
             shutil.copy2(inputs[0], local)
         else:
             hadd_inputs = [_pnfs_to_xrootd(p) for p in inputs]
-            _hadd(local, hadd_inputs, threads, work, chunk)
+            batch = int(chunk) if chunk and chunk > 0 else len(hadd_inputs)
+
+            if len(hadd_inputs) <= batch:
+                _hadd(local, hadd_inputs, threads, work)
+            else:
+                partials = []
+                for i in range(0, len(hadd_inputs), batch):
+                    part = os.path.join(work, f"part_{i//batch:04d}.root")
+                    _hadd(part, hadd_inputs[i:i+batch], threads, work)
+                    partials.append(part)
+
+                _hadd(local, partials, threads, work)
         return local, cleanup
     except Exception:
         cleanup()
