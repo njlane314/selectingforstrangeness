@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <merge_samples>
-  <production_xml>numi_fhc_run1.xml</production_xml>
+  <production_xml>config/numi_fhc_run1.xml</production_xml>
 
   <merged_dir>/exp/uboone/data/users/nlane/ntuples/merged_samples</merged_dir>
   <output_xml>merged-samples.xml</output_xml>

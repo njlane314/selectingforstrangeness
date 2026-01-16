@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<production>
+  <project name="numi_fhc_run1">
+    <stage name="beam_s0">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/beam/s0/out</outdir>
+    </stage>
+    <!--
+    <stage name="beam_s1">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/beam/s1/out</outdir>
+    </stage>
+    <stage name="beam_s2">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/beam/s2/out</outdir>
+    </stage>
+    <stage name="beam_s3">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/beam/s3/out</outdir>
+    </stage>
+
+    <stage name="dirt_s0">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/dirt/s0/out</outdir>
+    </stage>
+    <stage name="dirt_s1">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/dirt/s1/out</outdir>
+    </stage>
+
+    <stage name="ext_p0">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/ext/p0/out</outdir>
+    </stage>
+    <stage name="ext_p1">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/ext/p1/out</outdir>
+    </stage>
+    <stage name="ext_p2">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/ext/p2/out</outdir>
+    </stage>
+    -->
+
+    <stage name="strangeness_run1_fhc">
+      <outdir>/pnfs/uboone/scratch/users/nlane/ntuples/v08_00_00_82/numi_fhc_run1/strangeness/run1_fhc/out</outdir>
+    </stage>
+  </project>
+</production>
