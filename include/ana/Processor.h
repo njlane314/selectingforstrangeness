@@ -2,7 +2,7 @@
 
 #include <ROOT/RDF/RNode.hxx>
 
-namespace rarexsec {
+namespace strangeness {
 
 struct Entry;
 
@@ -15,4 +15,4 @@ public:
 
 const Processor& processor();
 
-}  // namespace rarexsec
+}  // namespace strangeness

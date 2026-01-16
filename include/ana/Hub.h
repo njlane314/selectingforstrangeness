@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace rarexsec {
+namespace strangeness {
 
 class Hub {
 public:
@@ -35,4 +35,4 @@ private:
   std::unordered_map<std::string, std::unordered_map<std::string, std::vector<Entry>>> db_;
 };
 
-}  // namespace rarexsec
+}  // namespace strangeness

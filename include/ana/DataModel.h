@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-namespace rarexsec {
+namespace strangeness {
 
 enum class Source { Data,
                     Ext,
@@ -181,4 +181,4 @@ struct Entry {
     }
 };
 
-}  // namespace rarexsec
+}  // namespace strangeness

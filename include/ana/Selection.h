@@ -11,7 +11,7 @@
 #include "ana/Hub.h"
 #include "ana/proc/Volume.h"
 
-namespace rarexsec {
+namespace strangeness {
 namespace selection {
 
 inline constexpr float trigger_min_beam_pe = 0.f;
@@ -128,4 +128,4 @@ inline EvalResult evaluate(const std::vector<const Entry*>& mc,
 }
 
 }  // namespace selection
-}  // namespace rarexsec
+}  // namespace strangeness
