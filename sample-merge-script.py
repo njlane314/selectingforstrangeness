@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
+# Minimal merge script driven by config/merge-samples.xml (optional: pass config path as argv[1])
+
+from __future__ import annotations
+
 import glob
 import os
-import os.path
-import pty
 import re
-import select
 import shutil
 import sqlite3
 import subprocess
@@ -15,28 +17,55 @@ from functools import lru_cache
 import numpy as np
 import uproot
 
-CONFIG = "config/merge-samples.xml"
+DEFAULT_CONFIG = "config/merge-samples.xml"
 DEFAULT_RUN_DB = "/exp/uboone/data/uboonebeam/beamdb/run.db"
+DEFAULT_INPUT_BASENAME = "nu_selection.root"
 
+# Optional prescale lookup (MicroBooNE-specific)
 try:
     sys.path.append("/exp/uboone/data/uboonebeam/beamdb")
-    import confDB
+    import confDB  # type: ignore
+
     _CONFDB = confDB.confDB()
 except Exception:
     _CONFDB = None
 
-def _read(p):
-    with open(p, "r", encoding="utf-8") as f:
+
+def _read_text(path: str) -> str:
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-def _abs(p, base):
-    p = (p or "").strip()
-    return p if (p and os.path.isabs(p)) else (os.path.abspath(os.path.join(base, p)) if p else "")
 
-def _expand_entities(txt):
-    ents = dict(re.findall(r'<!ENTITY\s+(\w+)\s+"([^"]*)"\s*>', txt))
-    done = {}
-    def res(k, stack=()):
+def _abs(path: str, base: str) -> str:
+    p = (path or "").strip()
+    if not p:
+        return ""
+    return p if os.path.isabs(p) else os.path.abspath(os.path.join(base, p))
+
+
+def _as_float(txt: str, default: float) -> float:
+    s = (txt or "").strip()
+    if not s:
+        return default
+    return float(s.replace("D", "e").replace("d", "e"))
+
+
+def _as_int(txt: str, default: int) -> int:
+    s = (txt or "").strip()
+    if not s:
+        return default
+    return int(s)
+
+
+def _expand_entities(xml_txt: str) -> str:
+    """
+    Expand simple <!ENTITY NAME "value"> substitutions inside a DOCTYPE, then strip the DOCTYPE.
+    This matches common production XML patterns used in workflows.
+    """
+    ents = dict(re.findall(r'<!ENTITY\s+(\w+)\s+"([^"]*)"\s*>', xml_txt))
+    done: dict[str, str] = {}
+
+    def res(k: str, stack: tuple[str, ...] = ()) -> str:
         if k in done:
             return done[k]
         if k not in ents:
@@ -46,80 +75,76 @@ def _expand_entities(txt):
         v = re.sub(r"&(\w+);", lambda m: res(m.group(1), stack + (k,)), ents[k])
         done[k] = v
         return v
+
     for k in list(ents):
         res(k)
-    txt = re.sub(r"&(\w+);", lambda m: done.get(m.group(1), m.group(0)), txt)
-    return re.sub(r"<!DOCTYPE[\s\S]*?\]>", "", txt, count=1)
 
-def _parse_prod_xml(path):
-    root = ET.fromstring(_expand_entities(_read(path)))
+    xml_txt = re.sub(r"&(\w+);", lambda m: done.get(m.group(1), m.group(0)), xml_txt)
+    # Strip the first DOCTYPE internal subset if present (keeps XML parseable)
+    return re.sub(r"<!DOCTYPE[\s\S]*?\]>", "", xml_txt, count=1)
+
+
+def _parse_production_xml(path: str) -> tuple[str, dict[str, str]]:
+    """
+    Returns: (project_name, {stage_name: outdir})
+    """
+    root = ET.fromstring(_expand_entities(_read_text(path)))
     proj = root.find("project") or root.find(".//project")
     if proj is None:
-        raise RuntimeError("could not find <project> in production XML")
-    name = (proj.attrib.get("name") or "project").strip()
-    outdirs = {}
+        raise RuntimeError("production_xml: could not find <project>")
+
+    project = (proj.attrib.get("name") or "project").strip() or "project"
+    outdirs: dict[str, str] = {}
+
     for st in proj.findall("stage"):
-        s = (st.attrib.get("name") or "").strip()
-        d = (st.findtext("outdir") or "").strip()
-        if s and d:
-            outdirs[s] = d
+        name = (st.attrib.get("name") or "").strip()
+        outdir = (st.findtext("outdir") or "").strip()
+        if name and outdir:
+            outdirs[name] = outdir
+
     if not outdirs:
-        raise RuntimeError("no <stage> outdirs found in production XML")
-    return name, outdirs
+        raise RuntimeError("production_xml: no <stage> outdirs found")
 
-def _classify(stage):
-    s = (stage or "").lower()
-    if s.startswith("ext"):
-        return "ext"
-    if s.startswith("dirt"):
-        return "dirt"
-    if "strange" in s:
-        return "strangeness"
-    if s.startswith("data"):
-        return "data"
-    return "beam"
+    return project, outdirs
 
-def _find_prod_xml(cwd):
-    cands = [p for p in sorted(glob.glob(os.path.join(cwd, "*.xml"))) if os.path.basename(p) not in {CONFIG, "merged-samples.xml"}]
-    for p in cands:
-        h = _read(p)[:20000]
-        if "<stage" in h and "<project" in h:
-            return p
-    return cands[0] if cands else ""
 
-def _write_cfg(cfg, prod, outdirs):
-    kinds = {}
-    for s in sorted(outdirs):
-        kinds.setdefault(_classify(s), []).append(s)
-    root = ET.Element("merge_samples")
-    ET.SubElement(root, "production_xml").text = os.path.basename(prod)
-    ET.SubElement(root, "merged_dir").text = "merged"
-    ET.SubElement(root, "output_xml").text = "merged-samples.xml"
-    ET.SubElement(root, "run_db").text = DEFAULT_RUN_DB
-    ET.SubElement(root, "toroid_scale").text = "1e12"
-    ET.SubElement(root, "subrun_tree").text = "nuselection/SubRun"
-    ET.SubElement(root, "hadd_threads").text = "8"
-    ET.SubElement(root, "chunk_size").text = "250"
-    ET.SubElement(root, "tmp_dir").text = os.environ.get("TMPDIR", "/tmp")
-    gs = ET.SubElement(root, "groups")
-    order = [k for k in ("beam", "dirt", "ext", "strangeness", "data") if k in kinds] + [k for k in sorted(kinds) if k not in {"beam","dirt","ext","strangeness","data"}]
-    for k in order:
-        g = ET.SubElement(gs, "group", attrib={"name": k, "kind": k})
-        g.text = ",".join(kinds[k])
-    ET.SubElement(root, "note").text = "This configuration uses run.db only (runinfo: EA9CNT, tortgt, EXTTrig)."
-    ET.ElementTree(root).write(cfg, encoding="utf-8", xml_declaration=True)
+def _read_merge_config(cfg_path: str, base: str):
+    """
+    Reads XML like:
 
-def _read_cfg(cfg, base):
-    r = ET.parse(cfg).getroot()
-    prod = _abs(r.findtext("production_xml"), base)
-    merged = _abs(r.findtext("merged_dir") or "merged", base)
+      <merge_samples>
+        <production_xml>...</production_xml>
+        <merged_dir>...</merged_dir>
+        <output_xml>...</output_xml>
+        <run_db>...</run_db>
+        <toroid_scale>...</toroid_scale>
+        <subrun_tree>...</subrun_tree>
+        <hadd_threads>...</hadd_threads>
+        <chunk_size>...</chunk_size>
+        <tmp_dir>...</tmp_dir>
+        <groups>
+          <group name="beam" kind="beam">beam_s0,beam_s1</group>
+          ...
+        </groups>
+      </merge_samples>
+    """
+    r = ET.parse(cfg_path).getroot()
+
+    prod = _abs(r.findtext("production_xml") or "", base)
+    merged_dir = _abs(r.findtext("merged_dir") or "merged", base)
     outxml = _abs(r.findtext("output_xml") or "merged-samples.xml", base)
+
     run_db = _abs(r.findtext("run_db") or DEFAULT_RUN_DB, base)
-    tor_scale = float((r.findtext("toroid_scale") or "1e12").strip().replace("D", "e").replace("d", "e"))
-    tree = (r.findtext("subrun_tree") or "nuselection/SubRun").strip()
-    threads = int((r.findtext("hadd_threads") or "8").strip())
-    chunk = int((r.findtext("chunk_size") or "250").strip())
-    tmp = _abs(r.findtext("tmp_dir") or os.environ.get("TMPDIR", "/tmp"), base)
+    tor_scale = _as_float(r.findtext("toroid_scale") or "1e12", 1e12)
+
+    subrun_tree = (r.findtext("subrun_tree") or "nuselection/SubRun").strip()
+    threads = _as_int(r.findtext("hadd_threads") or "8", 8)
+    chunk = _as_int(r.findtext("chunk_size") or "250", 250)
+
+    tmp_dir = _abs(r.findtext("tmp_dir") or os.environ.get("TMPDIR", "/tmp"), base)
+    if not os.path.isdir(tmp_dir):
+        tmp_dir = os.environ.get("TMPDIR", "/tmp")
+
     groups = []
     gs = r.find("groups")
     if gs is not None:
@@ -129,44 +154,35 @@ def _read_cfg(cfg, base):
             stages = [x.strip() for x in (g.text or "").split(",") if x.strip()]
             if name and stages:
                 groups.append((name, kind, stages))
-    return prod, merged, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups
 
-def _run(cmd):
-    p = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=0,
-    )
+    return prod, merged_dir, outxml, run_db, tor_scale, subrun_tree, threads, chunk, tmp_dir, groups
 
-    captured = bytearray()
-    assert p.stdout is not None
-    try:
-        for data in iter(lambda: p.stdout.read(8192), b""):
-            if not data:
-                break
-            sys.stdout.buffer.write(data)
-            sys.stdout.buffer.flush()
-            captured += data
-    finally:
-        p.stdout.close()
 
-    rc = p.wait()
-    if rc != 0:
-        raise RuntimeError(
-            "command failed: " + " ".join(cmd) + "\n" + captured.decode("utf-8", "replace")
-        )
+def _inputs_from_outdir(outdir: str, basename: str = DEFAULT_INPUT_BASENAME) -> list[str]:
+    """
+    MicroBooNE production style: outdir/<jobid>/nu_selection.root
+    """
+    if not os.path.isdir(outdir):
+        return []
+    out = []
+    with os.scandir(outdir) as it:
+        for e in it:
+            if not e.is_dir():
+                continue
+            p = os.path.join(e.path, basename)
+            if os.path.isfile(p):
+                out.append(p)
+    return sorted(set(out))
 
-def _is_pnfs(p):
+
+def _is_pnfs(p: str) -> bool:
     return p.startswith("/pnfs/")
 
-def _uptodate(outp, inputs):
-    if not os.path.exists(outp):
-        return False
-    om = os.path.getmtime(outp)
-    return all(os.path.exists(i) and os.path.getmtime(i) <= om for i in inputs)
 
-def _pnfs_to_xrootd(p):
+def _pnfs_to_xrootd(p: str) -> str:
+    """
+    Prefer local pnfs path if readable; else convert to an xrootd URL.
+    """
     if not _is_pnfs(p):
         return p
 
@@ -185,34 +201,51 @@ def _pnfs_to_xrootd(p):
 
     suffix = p
     if not suffix.startswith("/pnfs/fnal.gov"):
-        suffix = "/pnfs/fnal.gov" + p[len("/pnfs"):]
+        suffix = "/pnfs/fnal.gov" + p[len("/pnfs") :]
     return f"root://fndca1.fnal.gov:1094{suffix}"
 
-def _hadd(outp, inputs, threads, work):
+
+def _uptodate(outp: str, inputs: list[str]) -> bool:
+    if not os.path.exists(outp):
+        return False
+    om = os.path.getmtime(outp)
+    return all(os.path.exists(i) and os.path.getmtime(i) <= om for i in inputs)
+
+
+def _hadd(outp: str, inputs: list[str], threads: int, work: str) -> None:
     if not inputs:
-        raise RuntimeError("hadd called with no inputs")
+        raise RuntimeError("hadd: no inputs")
 
     cmd = ["hadd", "-f", "-k"]
-
     if threads and threads > 1:
         d = os.path.join(work, "hadd_tmp", os.path.basename(outp).replace(".root", ""))
         os.makedirs(d, exist_ok=True)
         cmd += ["-j", str(threads), "-d", d]
 
     cmd += [outp] + list(inputs)
-    _run(cmd)
+    subprocess.run(cmd, check=True)
 
-def _merge(dest, inputs, threads, chunk, tmp):
+
+def _merge(dest: str, inputs: list[str], threads: int, chunk: int, tmp: str) -> tuple[str, callable]:
+    """
+    Merge inputs into dest. If dest is on /pnfs, write locally then copy later (caller decides).
+    Returns: (local_merged_path, cleanup_fn)
+    """
     inputs = sorted(set(inputs))
     if not inputs:
-        raise RuntimeError("no input files for " + dest)
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
+        raise RuntimeError("merge: no inputs for " + dest)
+
+    os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+
+    # If already up-to-date, just use dest directly (no temp dir).
     if _uptodate(dest, inputs):
         return dest, lambda: None
 
     work = tempfile.mkdtemp(prefix="merge_", dir=tmp if os.path.isdir(tmp) else None)
     cleanup = lambda: shutil.rmtree(work, ignore_errors=True)
+
     local = os.path.join(work, "merged.root") if _is_pnfs(dest) else dest
+
     try:
         if len(inputs) == 1:
             shutil.copy2(inputs[0], local)
@@ -226,73 +259,96 @@ def _merge(dest, inputs, threads, chunk, tmp):
                 partials = []
                 for i in range(0, len(hadd_inputs), batch):
                     part = os.path.join(work, f"part_{i//batch:04d}.root")
-                    _hadd(part, hadd_inputs[i:i+batch], threads, work)
+                    _hadd(part, hadd_inputs[i : i + batch], threads, work)
                     partials.append(part)
-
                 _hadd(local, partials, threads, work)
+
         return local, cleanup
     except Exception:
         cleanup()
         raise
 
-def _inputs_from_outdir(outdir):
-    res = []
-    if not os.path.isdir(outdir):
-        return res
-    with os.scandir(outdir) as it:
-        for e in it:
-            if not e.is_dir():
-                continue
-            p = os.path.join(e.path, "nu_selection.root")
-            if os.path.isfile(p):
-                res.append(p)
-    return sorted(set(res))
 
-def _keys_and_pot(root_path, tree_path):
+def _keys_and_pot(root_path: str, tree_path: str) -> tuple[np.ndarray, float]:
+    """
+    Read run/subRun/pot from tree and compute:
+      - unique (run,subRun) keys
+      - pot_sum = sum over unique subruns of max(pot) per subrun
+    """
     t = uproot.open(f"{root_path}:{tree_path}")
     run = t["run"].array(library="np").astype(np.int64)
     sub = t["subRun"].array(library="np").astype(np.int64) & np.int64(0xFFFFFFFF)
     pot = t["pot"].array(library="np").astype(np.float64)
-    key = (run << np.int64(32)) | sub
-    o = np.argsort(key, kind="mergesort")
-    ks = key[o]
-    ps = pot[o]
-    if ks.size == 0:
-        return ks, 0.0
-    idx = np.r_[0, np.flatnonzero(ks[1:] != ks[:-1]) + 1]
-    pm = np.maximum.reduceat(ps, idx)
-    ku = ks[idx]
-    return ku, float(pm.sum())
 
-def _pairs_from_keys(keys):
+    key = (run << np.int64(32)) | sub
+    if key.size == 0:
+        return key, 0.0
+
+    order = np.argsort(key, kind="mergesort")
+    ks = key[order]
+    ps = pot[order]
+
+    # indices of unique keys
+    idx = np.r_[0, np.flatnonzero(ks[1:] != ks[:-1]) + 1]
+    # max pot per unique key, then sum
+    pm = np.maximum.reduceat(ps, idx)
+
+    return ks[idx], float(pm.sum())
+
+
+def _pairs_from_keys(keys: np.ndarray) -> list[tuple[int, int]]:
     r = (keys >> np.int64(32)).astype(np.int64)
     s = (keys & np.int64(0xFFFFFFFF)).astype(np.int64)
     return list(zip(r.tolist(), s.tolist()))
 
-def _pick_col(cols, candidates):
+
+def _pick_col(cols: list[str], candidates: list[str]) -> str:
     m = {c.lower(): c for c in cols}
     for c in candidates:
         if c.lower() in m:
             return m[c.lower()]
-    raise RuntimeError("missing required column(s): " + ",".join(candidates))
+    raise RuntimeError("run.db: missing required column(s): " + ",".join(candidates))
 
-def _runinfo_sums(run_db, pairs):
+
+def _qident(col: str) -> str:
+    # Safe-ish identifier quoting for SQLite
+    return '"' + col.replace('"', '""') + '"'
+
+
+def _runinfo_sums(run_db: str, pairs: list[tuple[int, int]]):
+    """
+    Query run.db runinfo table for a subset of (run,subrun),
+    deduplicate within (run,subrun) by MAX, then sum.
+    Also returns ext sum per run (for prescale).
+    """
     if not os.path.exists(run_db):
         raise RuntimeError("run.db not found: " + run_db)
+
     con = sqlite3.connect(run_db)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
+
     cur.execute("PRAGMA table_info(runinfo);")
     cols = [r[1] for r in cur.fetchall()]
+    if not cols:
+        con.close()
+        raise RuntimeError("run.db: table runinfo not found or has no columns")
+
     ea9c = _pick_col(cols, ["EA9CNT"])
     tortc = _pick_col(cols, ["tortgt"])
     extc = _pick_col(cols, ["EXTTrig"])
+
+    ea9q, tortq, extq = _qident(ea9c), _qident(tortc), _qident(extc)
+
     cur.execute("PRAGMA temp_store=MEMORY;")
     cur.execute("CREATE TEMP TABLE pairs(run INTEGER, subrun INTEGER, PRIMARY KEY(run,subrun));")
     cur.executemany("INSERT OR IGNORE INTO pairs(run, subrun) VALUES (?,?);", pairs)
-    row = cur.execute(f"""
+
+    row = cur.execute(
+        f"""
         WITH subset AS (
-          SELECT r.run AS run, r.subrun AS subrun, r.{ea9c} AS ea9, r.{tortc} AS tort, r.{extc} AS ext
+          SELECT r.run AS run, r.subrun AS subrun,
+                 r.{ea9q} AS ea9, r.{tortq} AS tort, r.{extq} AS ext
           FROM runinfo r
           JOIN pairs p ON p.run=r.run AND p.subrun=r.subrun
         ),
@@ -306,10 +362,13 @@ def _runinfo_sums(run_db, pairs):
                IFNULL(SUM(ext),0.0) AS ext_sum,
                COUNT(*) AS matched
         FROM dedup;
-    """).fetchone()
-    by_run = cur.execute(f"""
+        """
+    ).fetchone()
+
+    by_run = cur.execute(
+        f"""
         WITH subset AS (
-          SELECT r.run AS run, r.subrun AS subrun, r.{extc} AS ext
+          SELECT r.run AS run, r.subrun AS subrun, r.{extq} AS ext
           FROM runinfo r
           JOIN pairs p ON p.run=r.run AND p.subrun=r.subrun
         ),
@@ -321,12 +380,27 @@ def _runinfo_sums(run_db, pairs):
         SELECT run, IFNULL(SUM(ext),0.0) AS ext_sum
         FROM dedup
         GROUP BY run;
-    """).fetchall()
+        """
+    ).fetchall()
+
     con.close()
-    return float(row["ea9_sum"]), float(row["tort_sum"]), float(row["ext_sum"]), int(row["matched"]), ea9c, tortc, extc, {int(r["run"]): float(r["ext_sum"]) for r in by_run}
+
+    ext_by_run = {int(r["run"]): float(r["ext_sum"]) for r in by_run}
+
+    return (
+        float(row["ea9_sum"]),
+        float(row["tort_sum"]),
+        float(row["ext_sum"]),
+        int(row["matched"]),
+        ea9c,
+        tortc,
+        extc,
+        ext_by_run,
+    )
+
 
 @lru_cache(maxsize=4096)
-def _prescale(run):
+def _prescale(run: int) -> float:
     if _CONFDB is None:
         return 1.0
     try:
@@ -342,74 +416,86 @@ def _prescale(run):
         return 1.0
     return 1.0
 
-def _ext_prescaled(by_run):
-    return float(sum(v * _prescale(r) for r, v in by_run.items()))
 
-def _write_meta(root_path, nums, strs):
-    import ROOT
+def _ext_prescaled(ext_by_run: dict[int, float]) -> float:
+    return float(sum(v * _prescale(r) for r, v in ext_by_run.items()))
+
+
+def _write_meta(root_path: str, nums: dict[str, float], strs: dict[str, str]) -> None:
+    import ROOT  # local import keeps startup lighter
+
     ROOT.gROOT.SetBatch(True)
     f = ROOT.TFile.Open(root_path, "UPDATE")
     if not f or f.IsZombie():
         raise RuntimeError("could not open ROOT file for update: " + root_path)
+
     for k, v in nums.items():
-        ROOT.TParameter("double")(k, float(v)).Write(k, ROOT.TObject.kOverwrite)
+        ROOT.TParameter("double")(k, float(v)).Write("", ROOT.TObject.kOverwrite)
+
     for k, v in strs.items():
-        ROOT.TNamed(k, str(v)).Write(k, ROOT.TObject.kOverwrite)
+        ROOT.TNamed(k, str(v)).Write("", ROOT.TObject.kOverwrite)
+
     f.Close()
 
-def _write_outxml(path, prod, project, merged_dir, run_db, tree, samples):
-    root = ET.Element("merged_samples", attrib={
-        "production_xml": prod,
-        "project": project,
-        "merged_dir": merged_dir,
-        "run_db": run_db,
-        "subrun_tree": tree,
-    })
+
+def _write_outxml(path: str, prod: str, project: str, merged_dir: str, run_db: str, tree: str, samples: list[dict]):
+    root = ET.Element(
+        "merged_samples",
+        attrib={
+            "production_xml": prod,
+            "project": project,
+            "merged_dir": merged_dir,
+            "run_db": run_db,
+            "subrun_tree": tree,
+        },
+    )
     for s in samples:
         ET.SubElement(root, "sample", attrib={k: str(v) for k, v in s.items()})
+
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
-def main():
+
+def main(cfg_path: str) -> None:
     base = os.getcwd()
-    cfg = os.path.join(base, CONFIG)
-    if not os.path.exists(cfg):
-        prod = _find_prod_xml(base)
-        if not prod:
-            raise RuntimeError("No production XML found in this directory.")
-        _, outdirs = _parse_prod_xml(prod)
-        _write_cfg(cfg, prod, outdirs)
-        print(f"Created {CONFIG}. Edit groups if desired, then rerun.")
-        return
+    cfg_path = _abs(cfg_path, base)
 
-    prod, merged_dir, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups = _read_cfg(cfg, base)
+    if not os.path.exists(cfg_path):
+        raise RuntimeError("missing config: " + cfg_path)
+
+    prod, merged_dir, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups = _read_merge_config(cfg_path, base)
+
     if not prod or not os.path.exists(prod):
-        raise RuntimeError("production_xml not found")
+        raise RuntimeError("production_xml not found: " + (prod or "(empty)"))
     if not groups:
-        raise RuntimeError("No groups defined in config/merge-samples.xml")
+        raise RuntimeError("no <groups> defined in " + cfg_path)
 
-    project, stage_outdirs = _parse_prod_xml(prod)
+    project, stage_outdirs = _parse_production_xml(prod)
+
     out_proj = os.path.join(merged_dir, project)
     os.makedirs(out_proj, exist_ok=True)
 
-    samples = []
+    samples_out: list[dict] = []
+
     for name, kind, stages in groups:
         out = os.path.join(out_proj, f"{name}.root")
-        ins = []
+
+        inputs: list[str] = []
         for st in stages:
             if st not in stage_outdirs:
-                raise RuntimeError("stage not found in production XML: " + st)
-            ins += _inputs_from_outdir(stage_outdirs[st])
-        ins = sorted(set(ins))
-        if not ins:
-            print(f"Skipping {name}: no input files found.")
+                raise RuntimeError(f"stage '{st}' not found in production XML")
+            inputs += _inputs_from_outdir(stage_outdirs[st], basename=DEFAULT_INPUT_BASENAME)
+
+        inputs = sorted(set(inputs))
+        if not inputs:
+            print(f"[merge] skip {name}: no inputs found")
             continue
 
-        print(f"Merging {name} ({kind}): {len(ins)} files")
-        merged, cleanup = _merge(out, ins, threads, chunk, tmp)
+        print(f"[merge] {name} ({kind}): {len(inputs)} files -> {out}")
+        merged_local, cleanup = _merge(out, inputs, threads, chunk, tmp)
 
         try:
-            keys, pot_sum = _keys_and_pot(merged, tree)
+            keys, pot_sum = _keys_and_pot(merged_local, tree)
             pairs = _pairs_from_keys(keys)
 
             ea9_sum, tort_raw, ext_raw, matched, ea9c, tortc, extc, ext_by_run = _runinfo_sums(run_db, pairs)
@@ -418,19 +504,22 @@ def main():
             ext_prescaled = float(_ext_prescaled(ext_by_run))
             ext_pot_equiv = 0.0
 
-            if kind == "ext":
+            k = (kind or "").lower()
+
+            if k == "ext":
                 scale_to_data = (ea9_sum / ext_prescaled) if ext_prescaled > 0 else 0.0
                 ext_pot_equiv = tort_pot * scale_to_data if ext_prescaled > 0 else 0.0
                 normalisation = f"{ea9c}/{extc}_prescaled"
-            elif kind == "data":
+            elif k == "data":
                 scale_to_data = 1.0
                 normalisation = "unity"
             else:
                 scale_to_data = (tort_pot / pot_sum) if pot_sum > 0 else 0.0
                 normalisation = f"{tortc}*toroid_scale/pot"
 
+            # Write metadata into merged file
             _write_meta(
-                merged,
+                merged_local,
                 {
                     "pot_sum": pot_sum,
                     "runinfo_ea9_sum": ea9_sum,
@@ -441,6 +530,7 @@ def main():
                     "ext_pot_equiv": ext_pot_equiv,
                     "toroid_scale": tor_scale,
                     "scale_to_data": scale_to_data,
+                    "w_norm": scale_to_data,  # alias for downstream code that expects a single global weight
                     "subruns_total": float(len(pairs)),
                     "runinfo_subruns_matched": float(matched),
                 },
@@ -449,7 +539,7 @@ def main():
                     "sample_kind": kind,
                     "normalisation": normalisation,
                     "production_xml": prod,
-                    "merge_config": cfg,
+                    "merge_config": cfg_path,
                     "run_db": run_db,
                     "ea9_column": ea9c,
                     "tortgt_column": tortc,
@@ -459,35 +549,41 @@ def main():
                 },
             )
 
-            if _is_pnfs(out) and merged != out:
-                shutil.copy2(merged, out)
+            # If output is on pnfs and we wrote locally, copy result to final destination
+            if _is_pnfs(out) and merged_local != out:
+                shutil.copy2(merged_local, out)
 
             if matched != len(pairs):
-                print(f"Warning: {name}: matched {matched}/{len(pairs)} subruns in runinfo")
+                print(f"[merge] WARN {name}: matched {matched}/{len(pairs)} subruns in runinfo")
 
-            samples.append({
-                "name": name,
-                "kind": kind,
-                "file": out,
-                "subruns_total": len(pairs),
-                "pot_sum": f"{pot_sum:.17g}",
-                "runinfo_ea9_sum": f"{ea9_sum:.17g}",
-                "runinfo_tortgt_pot": f"{tort_pot:.17g}",
-                "scale_to_data": f"{scale_to_data:.17g}",
-                "normalisation": normalisation,
-                "exttrig_raw": f"{ext_raw:.17g}",
-                "exttrig_prescaled": f"{ext_prescaled:.17g}",
-                "ext_pot_equiv": f"{ext_pot_equiv:.17g}",
-            })
+            samples_out.append(
+                {
+                    "name": name,
+                    "kind": kind,
+                    "file": out,
+                    "subruns_total": len(pairs),
+                    "pot_sum": f"{pot_sum:.17g}",
+                    "runinfo_ea9_sum": f"{ea9_sum:.17g}",
+                    "runinfo_tortgt_pot": f"{tort_pot:.17g}",
+                    "scale_to_data": f"{scale_to_data:.17g}",
+                    "normalisation": normalisation,
+                    "exttrig_raw": f"{ext_raw:.17g}",
+                    "exttrig_prescaled": f"{ext_prescaled:.17g}",
+                    "ext_pot_equiv": f"{ext_pot_equiv:.17g}",
+                }
+            )
+
         finally:
             cleanup()
 
-    _write_outxml(outxml, prod, project, merged_dir, run_db, tree, samples)
-    print(f"Wrote {outxml}")
+    _write_outxml(outxml, prod, project, merged_dir, run_db, tree, samples_out)
+    print(f"[merge] wrote {outxml}")
+
 
 if __name__ == "__main__":
+    cfg = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CONFIG
     try:
-        main()
+        main(cfg)
     except Exception as e:
         print(str(e), file=sys.stderr)
         sys.exit(2)
