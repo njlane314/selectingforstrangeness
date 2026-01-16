@@ -1,7 +1,7 @@
-#include "ana/rarexsec/Hub.h"
+#include "ana/Hub.h"
 
-#include "ana/rarexsec/Processor.h"
-#include "ana/rarexsec/proc/Volume.h"
+#include "ana/Processor.h"
+#include "ana/proc/Volume.h"
 
 #include <algorithm>
 #include <cctype>

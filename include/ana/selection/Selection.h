@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "ana/rarexsec/Hub.h"
-#include "ana/rarexsec/proc/Volume.h"
+#include "ana/Hub.h"
+#include "ana/proc/Volume.h"
 
 namespace rarexsec {
 namespace selection {

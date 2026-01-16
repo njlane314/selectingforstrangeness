@@ -1,8 +1,8 @@
-#include "ana/rarexsec/Processor.h"
-#include "ana/rarexsec/proc/Selection.h"
-#include "ana/rarexsec/proc/Volume.h"
+#include "ana/Processor.h"
+#include "ana/proc/Selection.h"
+#include "ana/proc/Volume.h"
 
-#include "ana/rarexsec/Hub.h"
+#include "ana/Hub.h"
 
 #include <ROOT/RVec.hxx>
 #include <algorithm>

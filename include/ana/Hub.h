@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ana/rarexsec/DataModel.h"
-#include "ana/rarexsec/Processor.h"
+#include "ana/DataModel.h"
+#include "ana/Processor.h"
 
 #include <ROOT/RDataFrame.hxx>
 #include <ROOT/RDF/RNode.hxx>
