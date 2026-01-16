@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "ana/Hub.h"
+#include "ana/Registry.h"
 #include "ana/proc/Volume.h"
 
 namespace strangeness {
