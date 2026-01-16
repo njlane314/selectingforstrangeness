@@ -164,14 +164,19 @@ def _inputs_from_outdir(outdir: str, basename: str = DEFAULT_INPUT_BASENAME) -> 
     """
     if not os.path.isdir(outdir):
         return []
+    basenames = (basename,)
+    if basename == DEFAULT_INPUT_BASENAME:
+        basenames = (basename, "nu_selection_data.root")
     out = []
     with os.scandir(outdir) as it:
         for e in it:
             if not e.is_dir():
                 continue
-            p = os.path.join(e.path, basename)
-            if os.path.isfile(p):
-                out.append(p)
+            for candidate in basenames:
+                p = os.path.join(e.path, candidate)
+                if os.path.isfile(p):
+                    out.append(p)
+                    break
     return sorted(set(out))
 
 
