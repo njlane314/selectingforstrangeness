@@ -515,6 +515,8 @@ def main(cfg_path: str) -> None:
             ext_pot_equiv = 0.0
 
             k = (kind or "").lower()
+            if k == "ext":
+                pot_sum = 0.0
 
             if k == "ext":
                 scale_to_data = (ea9_sum / ext_prescaled) if ext_prescaled > 0 else 0.0
