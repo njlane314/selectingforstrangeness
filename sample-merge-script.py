@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Minimal merge script driven by config/merge-samples.xml (optional: pass config path as argv[1])
 
 from __future__ import annotations
 
@@ -21,7 +20,6 @@ DEFAULT_CONFIG = "config/merge-samples.xml"
 DEFAULT_RUN_DB = "/exp/uboone/data/uboonebeam/beamdb/run.db"
 DEFAULT_INPUT_BASENAME = "nu_selection.root"
 
-# Optional prescale lookup (MicroBooNE-specific)
 try:
     sys.path.append("/exp/uboone/data/uboonebeam/beamdb")
     import confDB  # type: ignore
@@ -80,7 +78,6 @@ def _expand_entities(xml_txt: str) -> str:
         res(k)
 
     xml_txt = re.sub(r"&(\w+);", lambda m: done.get(m.group(1), m.group(0)), xml_txt)
-    # Strip the first DOCTYPE internal subset if present (keeps XML parseable)
     return re.sub(r"<!DOCTYPE[\s\S]*?\]>", "", xml_txt, count=1)
 
 
@@ -242,7 +239,6 @@ def _merge(dest: str, inputs: list[str], threads: int, chunk: int, tmp: str) -> 
 
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
 
-    # If already up-to-date, just use dest directly (no temp dir).
     if _uptodate(dest, inputs):
         return dest, lambda: None
 
@@ -293,9 +289,7 @@ def _keys_and_pot(root_path: str, tree_path: str) -> tuple[np.ndarray, float]:
     ks = key[order]
     ps = pot[order]
 
-    # indices of unique keys
     idx = np.r_[0, np.flatnonzero(ks[1:] != ks[:-1]) + 1]
-    # max pot per unique key, then sum
     pm = np.maximum.reduceat(ps, idx)
 
     return ks[idx], float(pm.sum())
@@ -529,7 +523,6 @@ def main(cfg_path: str) -> None:
                 scale_to_data = (tort_pot / pot_sum) if pot_sum > 0 else 0.0
                 normalisation = f"{tortc}*toroid_scale/pot"
 
-            # Write metadata into merged file
             _write_meta(
                 merged_local,
                 {
@@ -561,7 +554,6 @@ def main(cfg_path: str) -> None:
                 },
             )
 
-            # If output is on pnfs and we wrote locally, copy result to final destination
             if _is_pnfs(out) and merged_local != out:
                 shutil.copy2(merged_local, out)
 
