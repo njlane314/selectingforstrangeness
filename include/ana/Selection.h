@@ -1,15 +1,11 @@
 #pragma once
 
+#include "ana/DataModel.h"
+
 #include <ROOT/RDataFrame.hxx>
 #include <ROOT/RVec.hxx>
-#include <RtypesCore.h>
 #include <cstddef>
-#include <iostream>
-#include <string>
 #include <vector>
-
-#include "ana/Hub.h"
-#include "ana/proc/Volume.h"
 
 namespace strangeness {
 namespace selection {

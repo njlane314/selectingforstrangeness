@@ -1,8 +1,7 @@
 #include "ana/Processor.h"
-#include "ana/proc/Selection.h"
-#include "ana/proc/Volume.h"
 
-#include "ana/Hub.h"
+#include "ana/DataModel.h"
+#include "ana/Fiducial.h"
 
 #include <ROOT/RDataFrame.hxx>
 #include <ROOT/RVec.hxx>
