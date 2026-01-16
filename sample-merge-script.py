@@ -15,7 +15,7 @@ from functools import lru_cache
 import numpy as np
 import uproot
 
-CONFIG = "merge-samples.xml"
+CONFIG = "config/merge-samples.xml"
 DEFAULT_RUN_DB = "/exp/uboone/data/uboonebeam/beamdb/run.db"
 
 try:
@@ -386,7 +386,7 @@ def main():
     if not prod or not os.path.exists(prod):
         raise RuntimeError("production_xml not found")
     if not groups:
-        raise RuntimeError("No groups defined in merge-samples.xml")
+        raise RuntimeError("No groups defined in config/merge-samples.xml")
 
     project, stage_outdirs = _parse_prod_xml(prod)
     out_proj = os.path.join(merged_dir, project)
