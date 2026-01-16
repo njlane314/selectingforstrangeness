@@ -95,8 +95,12 @@ def inputs_from_outdir(mod: ModuleType, outdir: str) -> list[str]:
     except TypeError:
         sig = inspect.signature(fn)
         if len(sig.parameters) >= 2:
-            basename = getattr(mod, "DEFAULT_INPUT_BASENAME", "nu_selection.root")
-            return fn(outdir, basename=basename)
+            basenames = getattr(
+                mod,
+                "DEFAULT_INPUT_BASENAMES",
+                getattr(mod, "DEFAULT_INPUT_BASENAME", "nu_selection.root"),
+            )
+            return fn(outdir, basename=basenames)
         raise
 
 

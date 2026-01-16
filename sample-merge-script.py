@@ -20,6 +20,7 @@ import uproot
 DEFAULT_CONFIG = "config/merge-samples.xml"
 DEFAULT_RUN_DB = "/exp/uboone/data/uboonebeam/beamdb/run.db"
 DEFAULT_INPUT_BASENAME = "nu_selection.root"
+DEFAULT_INPUT_BASENAMES = (DEFAULT_INPUT_BASENAME, "nu_selection_data.root")
 
 # Optional prescale lookup (MicroBooNE-specific)
 try:
@@ -158,20 +159,24 @@ def _read_merge_config(cfg_path: str, base: str):
     return prod, merged_dir, outxml, run_db, tor_scale, subrun_tree, threads, chunk, tmp_dir, groups
 
 
-def _inputs_from_outdir(outdir: str, basename: str = DEFAULT_INPUT_BASENAME) -> list[str]:
+def _inputs_from_outdir(
+    outdir: str, basename: str | list[str] | tuple[str, ...] = DEFAULT_INPUT_BASENAME
+) -> list[str]:
     """
     MicroBooNE production style: outdir/<jobid>/nu_selection.root
     """
     if not os.path.isdir(outdir):
         return []
     out = []
+    basenames = [basename] if isinstance(basename, str) else list(basename)
     with os.scandir(outdir) as it:
         for e in it:
             if not e.is_dir():
                 continue
-            p = os.path.join(e.path, basename)
-            if os.path.isfile(p):
-                out.append(p)
+            for base in basenames:
+                p = os.path.join(e.path, base)
+                if os.path.isfile(p):
+                    out.append(p)
     return sorted(set(out))
 
 
@@ -484,7 +489,7 @@ def main(cfg_path: str) -> None:
         for st in stages:
             if st not in stage_outdirs:
                 raise RuntimeError(f"stage '{st}' not found in production XML")
-            inputs += _inputs_from_outdir(stage_outdirs[st], basename=DEFAULT_INPUT_BASENAME)
+            inputs += _inputs_from_outdir(stage_outdirs[st], basename=DEFAULT_INPUT_BASENAMES)
 
         inputs = sorted(set(inputs))
         if not inputs:
