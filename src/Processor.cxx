@@ -4,6 +4,7 @@
 
 #include "ana/Hub.h"
 
+#include <ROOT/RDataFrame.hxx>
 #include <ROOT/RVec.hxx>
 #include <algorithm>
 #include <cmath>
