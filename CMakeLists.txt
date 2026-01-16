@@ -12,7 +12,6 @@ add_library(ana SHARED)
 target_sources(ana PRIVATE
   src/Hub.cxx
   src/Processor.cxx
-  src/Selection.cxx
 )
 
 target_include_directories(ana PUBLIC
