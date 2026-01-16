@@ -23,37 +23,37 @@ static std::string to_lower(std::string s)
     return s;
 }
 //____________________________________________________________________________
-static rarexsec::Slice parse_slice_opt(const json& j)
+static strangeness::Slice parse_slice_opt(const json& j)
 {
     if (!j.contains("slice"))
-        return rarexsec::Slice::None;
+        return strangeness::Slice::None;
     const auto s = to_lower(j.at("slice").get<std::string>());
     if (s == "beam" || s == "beaminclusive")
-        return rarexsec::Slice::BeamInclusive;
+        return strangeness::Slice::BeamInclusive;
     if (s == "strange" || s == "strangeness" || s == "strangenessinclusive")
-        return rarexsec::Slice::StrangenessInclusive;
+        return strangeness::Slice::StrangenessInclusive;
     throw std::runtime_error("unknown slice: " + s);
 }
 //____________________________________________________________________________
-static std::pair<rarexsec::Source, rarexsec::Slice>
+static std::pair<strangeness::Source, strangeness::Slice>
 parse_kind_slice(const std::string& kind, const json& s)
 {
     if (kind == "data")
-        return {rarexsec::Source::Data, rarexsec::Slice::None};
+        return {strangeness::Source::Data, strangeness::Slice::None};
     if (kind == "ext" || kind == "external")
-        return {rarexsec::Source::Ext, rarexsec::Slice::None};
+        return {strangeness::Source::Ext, strangeness::Slice::None};
     if (kind == "mc")
-        return {rarexsec::Source::MC, parse_slice_opt(s)};
+        return {strangeness::Source::MC, parse_slice_opt(s)};
     if (kind == "beam")
-        return {rarexsec::Source::MC, rarexsec::Slice::BeamInclusive};
+        return {strangeness::Source::MC, strangeness::Slice::BeamInclusive};
     if (kind == "strangeness")
-        return {rarexsec::Source::MC, rarexsec::Slice::StrangenessInclusive};
+        return {strangeness::Source::MC, strangeness::Slice::StrangenessInclusive};
     if (kind == "dirt")
-        return {rarexsec::Source::MC, rarexsec::Slice::None};
+        return {strangeness::Source::MC, strangeness::Slice::None};
     throw std::runtime_error("unknown kind: " + kind);
 }
 //____________________________________________________________________________
-rarexsec::Frame rarexsec::Hub::sample(const Entry& rec) const
+strangeness::Frame strangeness::Hub::sample(const Entry& rec) const
 {
     static const std::string tree = "nuselection/EventSelectionFilter";
     auto df_ptr = std::make_shared<ROOT::RDataFrame>(tree, rec.files);
@@ -65,7 +65,7 @@ rarexsec::Frame rarexsec::Hub::sample(const Entry& rec) const
     return Frame{df_ptr, std::move(node)};
 }
 //____________________________________________________________________________
-rarexsec::Hub::Hub(const std::string& path, std::shared_ptr<Processor> processor)
+strangeness::Hub::Hub(const std::string& path, std::shared_ptr<Processor> processor)
     : processor_(std::move(processor))
 {
     std::ifstream cfg(path);
@@ -142,10 +142,10 @@ rarexsec::Hub::Hub(const std::string& path, std::shared_ptr<Processor> processor
     }
 }
 //____________________________________________________________________________
-ROOT::RDF::RNode rarexsec::Hub::apply_slice(ROOT::RDF::RNode node, const Entry& rec)
+ROOT::RDF::RNode strangeness::Hub::apply_slice(ROOT::RDF::RNode node, const Entry& rec)
 {
-    using rarexsec::Slice;
-    using rarexsec::Source;
+    using strangeness::Slice;
+    using strangeness::Source;
 
     if (rec.source == Source::MC) {
         if (rec.slice == Slice::StrangenessInclusive)
@@ -160,8 +160,8 @@ ROOT::RDF::RNode rarexsec::Hub::apply_slice(ROOT::RDF::RNode node, const Entry& 
     return node;
 }
 //____________________________________________________________________________
-std::vector<const rarexsec::Entry*>
-rarexsec::Hub::simulation_entries(const std::string& beamline,
+std::vector<const strangeness::Entry*>
+strangeness::Hub::simulation_entries(const std::string& beamline,
                                   const std::vector<std::string>& periods) const
 {
     std::vector<const Entry*> out;
@@ -180,8 +180,8 @@ rarexsec::Hub::simulation_entries(const std::string& beamline,
     return out;
 }
 //____________________________________________________________________________
-std::vector<const rarexsec::Entry*>
-rarexsec::Hub::data_entries(const std::string& beamline,
+std::vector<const strangeness::Entry*>
+strangeness::Hub::data_entries(const std::string& beamline,
                             const std::vector<std::string>& periods) const
 {
     std::vector<const Entry*> out;
@@ -199,7 +199,7 @@ rarexsec::Hub::data_entries(const std::string& beamline,
     return out;
 }
 //____________________________________________________________________________
-rarexsec::sample::origin rarexsec::sample::from_source_slice(Source source, Slice slice)
+strangeness::sample::origin strangeness::sample::from_source_slice(Source source, Slice slice)
 {
     if (source == Source::Data)
         return origin::data;

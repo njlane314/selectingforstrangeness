@@ -18,8 +18,8 @@ constexpr bool kTrainingIncludeExt = true;
 }  // namespace
 
 //____________________________________________________________________________
-ROOT::RDF::RNode rarexsec::Processor::run(ROOT::RDF::RNode node,
-                                          const rarexsec::Entry& rec) const
+ROOT::RDF::RNode strangeness::Processor::run(ROOT::RDF::RNode node,
+                                          const strangeness::Entry& rec) const
 {
     const bool is_data = (rec.source == Source::Data);
     const bool is_ext = (rec.source == Source::Ext);
@@ -98,7 +98,7 @@ ROOT::RDF::RNode rarexsec::Processor::run(ROOT::RDF::RNode node,
         node = node.Define(
             "in_fiducial",
             [](float x, float y, float z) {
-                return rarexsec::fiducial::is_in_truth_volume(x, y, z);
+                return strangeness::fiducial::is_in_truth_volume(x, y, z);
             },
             {"nu_vtx_x", "nu_vtx_y", "nu_vtx_z"});
 
@@ -200,7 +200,7 @@ ROOT::RDF::RNode rarexsec::Processor::run(ROOT::RDF::RNode node,
     node = node.Define(
         "in_reco_fiducial",
         [](float x, float y, float z) {
-            return rarexsec::fiducial::is_in_reco_volume(x, y, z);
+            return strangeness::fiducial::is_in_reco_volume(x, y, z);
         },
         {"reco_neutrino_vertex_sce_x", "reco_neutrino_vertex_sce_y", "reco_neutrino_vertex_sce_z"});
 
@@ -209,7 +209,7 @@ ROOT::RDF::RNode rarexsec::Processor::run(ROOT::RDF::RNode node,
 //____________________________________________________________________________
 
 //____________________________________________________________________________
-const rarexsec::Processor& rarexsec::processor()
+const strangeness::Processor& strangeness::processor()
 {
     static const Processor ep{};
     return ep;
