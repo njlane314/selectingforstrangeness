@@ -310,7 +310,6 @@ def _pick_col(cols: list[str], candidates: list[str]) -> str:
 
 
 def _qident(col: str) -> str:
-    # Safe-ish identifier quoting for SQLite
     return '"' + col.replace('"', '""') + '"'
 
 
@@ -421,7 +420,7 @@ def _ext_prescaled(ext_by_run: dict[int, float]) -> float:
 
 
 def _write_meta(root_path: str, nums: dict[str, float], strs: dict[str, str]) -> None:
-    import ROOT  
+    import ROOT
 
     ROOT.gROOT.SetBatch(True)
     f = ROOT.TFile.Open(root_path, "UPDATE")
@@ -538,7 +537,7 @@ def main(cfg_path: str) -> None:
                     "ext_pot_equiv": ext_pot_equiv,
                     "toroid_scale": tor_scale,
                     "scale_to_data": scale_to_data,
-                    "w_norm": scale_to_data,  # alias for downstream code that expects a single global weight
+                    "w_norm": scale_to_data,
                     "subruns_total": float(len(pairs)),
                     "runinfo_subruns_matched": float(matched),
                 },
