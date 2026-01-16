@@ -22,7 +22,7 @@ DEFAULT_INPUT_BASENAME = "nu_selection.root"
 
 try:
     sys.path.append("/exp/uboone/data/uboonebeam/beamdb")
-    import confDB  # type: ignore
+    import confDB  
 
     _CONFDB = confDB.confDB()
 except Exception:
@@ -421,7 +421,7 @@ def _ext_prescaled(ext_by_run: dict[int, float]) -> float:
 
 
 def _write_meta(root_path: str, nums: dict[str, float], strs: dict[str, str]) -> None:
-    import ROOT  # local import keeps startup lighter
+    import ROOT  
 
     ROOT.gROOT.SetBatch(True)
     f = ROOT.TFile.Open(root_path, "UPDATE")
