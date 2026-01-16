@@ -1,4 +1,4 @@
-#include "ana/Hub.h"
+#include "ana/Registry.h"
 
 #include "ana/Processor.h"
 #include "ana/proc/Volume.h"
@@ -53,7 +53,7 @@ parse_kind_slice(const std::string& kind, const json& s)
     throw std::runtime_error("unknown kind: " + kind);
 }
 //____________________________________________________________________________
-strangeness::Frame strangeness::Hub::sample(const Entry& rec) const
+strangeness::Frame strangeness::Registry::sample(const Entry& rec) const
 {
     static const std::string tree = "nuselection/EventSelectionFilter";
     auto df_ptr = std::make_shared<ROOT::RDataFrame>(tree, rec.files);
@@ -65,7 +65,7 @@ strangeness::Frame strangeness::Hub::sample(const Entry& rec) const
     return Frame{df_ptr, std::move(node)};
 }
 //____________________________________________________________________________
-strangeness::Hub::Hub(const std::string& path, std::shared_ptr<Processor> processor)
+strangeness::Registry::Registry(const std::string& path, std::shared_ptr<Processor> processor)
     : processor_(std::move(processor))
 {
     std::ifstream cfg(path);
@@ -142,7 +142,7 @@ strangeness::Hub::Hub(const std::string& path, std::shared_ptr<Processor> proces
     }
 }
 //____________________________________________________________________________
-ROOT::RDF::RNode strangeness::Hub::apply_slice(ROOT::RDF::RNode node, const Entry& rec)
+ROOT::RDF::RNode strangeness::Registry::apply_slice(ROOT::RDF::RNode node, const Entry& rec)
 {
     using strangeness::Slice;
     using strangeness::Source;
@@ -161,7 +161,7 @@ ROOT::RDF::RNode strangeness::Hub::apply_slice(ROOT::RDF::RNode node, const Entr
 }
 //____________________________________________________________________________
 std::vector<const strangeness::Entry*>
-strangeness::Hub::simulation_entries(const std::string& beamline,
+strangeness::Registry::simulation_entries(const std::string& beamline,
                                   const std::vector<std::string>& periods) const
 {
     std::vector<const Entry*> out;
@@ -181,7 +181,7 @@ strangeness::Hub::simulation_entries(const std::string& beamline,
 }
 //____________________________________________________________________________
 std::vector<const strangeness::Entry*>
-strangeness::Hub::data_entries(const std::string& beamline,
+strangeness::Registry::data_entries(const std::string& beamline,
                             const std::vector<std::string>& periods) const
 {
     std::vector<const Entry*> out;

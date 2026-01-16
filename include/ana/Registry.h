@@ -13,10 +13,10 @@
 
 namespace strangeness {
 
-class Hub {
+class Registry {
 public:
-  explicit Hub(const std::string& path,
-               std::shared_ptr<Processor> processor = std::make_shared<Processor>());
+  explicit Registry(const std::string& path,
+                    std::shared_ptr<Processor> processor = std::make_shared<Processor>());
 
   Frame sample(const Entry& rec) const;
   ROOT::RDF::RNode apply_slice(ROOT::RDF::RNode node, const Entry& rec);

@@ -2,7 +2,7 @@
 #include "ana/proc/Selection.h"
 #include "ana/proc/Volume.h"
 
-#include "ana/Hub.h"
+#include "ana/Registry.h"
 
 #include <ROOT/RVec.hxx>
 #include <algorithm>
