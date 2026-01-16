@@ -4,7 +4,6 @@
 #include "ana/Processor.h"
 
 #include <ROOT/RDataFrame.hxx>
-#include <ROOT/RDF/RNode.hxx>
 
 #include <memory>
 #include <string>
