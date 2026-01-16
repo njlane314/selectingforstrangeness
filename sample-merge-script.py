@@ -452,7 +452,10 @@ def _write_outxml(path: str, prod: str, project: str, merged_dir: str, run_db: s
         ET.SubElement(root, "sample", attrib={k: str(v) for k, v in s.items()})
 
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+    tree_out = ET.ElementTree(root)
+    if hasattr(ET, "indent"):
+        ET.indent(tree_out, space="  ", level=0)
+    tree_out.write(path, encoding="utf-8", xml_declaration=True)
 
 
 def main(cfg_path: str) -> None:
