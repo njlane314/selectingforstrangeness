@@ -17,9 +17,9 @@ if [[ "$macro_path" != /* ]]; then
 fi
 
 if [[ ! -f "$build_dir/CMakeCache.txt" ]]; then
-  cmake -S "$project_root" -B "$build_dir" -DCMAKE_BUILD_TYPE=RelWithDebInfo
+  echo "Build directory not found. Run 'make' from the project root to build first." >&2
+  exit 1
 fi
-cmake --build "$build_dir" -j
 
 export ROOT_INCLUDE_PATH="$project_root/include:${ROOT_INCLUDE_PATH:-}"
 export LD_LIBRARY_PATH="$build_dir:${LD_LIBRARY_PATH:-}"
