@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SELECTION_H
+#define SELECTION_H
 
 #include "ana/DataModel.h"
 
@@ -125,3 +126,5 @@ inline EvalResult evaluate(const std::vector<const SampleRecord*>& mc,
 
 }  // namespace selection
 }  // namespace strangeness
+
+#endif  // SELECTION_H

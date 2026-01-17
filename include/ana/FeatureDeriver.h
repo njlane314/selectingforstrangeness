@@ -1,4 +1,5 @@
-#pragma once
+#ifndef FEATURE_DERIVER_H
+#define FEATURE_DERIVER_H
 
 #include <ROOT/RDataFrame.hxx>
 
@@ -16,3 +17,5 @@ public:
 const FeatureDeriver& feature_deriver();
 
 }
+
+#endif  // FEATURE_DERIVER_H

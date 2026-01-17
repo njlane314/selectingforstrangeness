@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include "ana/DataModel.h"
 
@@ -36,3 +37,5 @@ private:
 };
 
 }
+
+#endif  // CONFIG_H
