@@ -10,8 +10,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_library(ana SHARED)
 
 target_sources(ana PRIVATE
-  src/Hub.cxx
-  src/Processor.cxx
+  src/Config.cxx
+  src/FeatureDeriver.cxx
+  src/SampleCatalog.cxx
 )
 
 target_include_directories(ana PUBLIC

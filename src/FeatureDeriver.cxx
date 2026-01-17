@@ -1,4 +1,4 @@
-#include "ana/Processor.h"
+#include "ana/FeatureDeriver.h"
 
 #include "ana/DataModel.h"
 #include "ana/Fiducial.h"
@@ -18,8 +18,8 @@ constexpr bool kTrainingIncludeExt = true;
 }  // namespace
 
 //____________________________________________________________________________
-ROOT::RDF::RNode strangeness::Processor::run(ROOT::RDF::RNode node,
-                                          const strangeness::Entry& rec) const
+ROOT::RDF::RNode strangeness::FeatureDeriver::run(ROOT::RDF::RNode node,
+                                          const strangeness::SampleRecord& rec) const
 {
     const bool is_data = (rec.source == Source::Data);
     const bool is_ext = (rec.source == Source::Ext);
@@ -209,9 +209,9 @@ ROOT::RDF::RNode strangeness::Processor::run(ROOT::RDF::RNode node,
 //____________________________________________________________________________
 
 //____________________________________________________________________________
-const strangeness::Processor& strangeness::processor()
+const strangeness::FeatureDeriver& strangeness::feature_deriver()
 {
-    static const Processor ep{};
+    static const FeatureDeriver ep{};
     return ep;
 }
 //____________________________________________________________________________
