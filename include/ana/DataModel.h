@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATA_MODEL_H
+#define DATA_MODEL_H
 
 #include <ROOT/RDataFrame.hxx>
 #include <cstdint>
@@ -182,3 +183,5 @@ struct SampleRecord {
 };
 
 }  // namespace strangeness
+
+#endif  // DATA_MODEL_H

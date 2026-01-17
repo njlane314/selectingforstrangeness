@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SAMPLE_CATALOG_H
+#define SAMPLE_CATALOG_H
 
 #include "ana/DataModel.h"
 #include "ana/FeatureDeriver.h"
@@ -40,3 +41,5 @@ private:
 };
 
 }
+
+#endif  // SAMPLE_CATALOG_H
