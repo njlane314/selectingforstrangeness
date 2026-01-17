@@ -1,8 +1,6 @@
 #pragma once
 
-namespace ROOT::RDF {
-class RNode;
-}
+#include <ROOT/RDataFrame.hxx>
 
 namespace strangeness {
 
