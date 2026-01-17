@@ -11,73 +11,86 @@
 namespace strangeness {
 namespace selection {
 
-inline constexpr float trigger_min_beam_pe = 0.f;
-inline constexpr float trigger_max_veto_pe = 20.f;
+inline constexpr const char* nominal_weight_column = "w_nominal";
+inline constexpr const char* analysis_channel_column = "analysis_channels";
 
-inline constexpr int slice_required_count = 1;
-inline constexpr float slice_min_topology_score = 0.06f;
+inline constexpr float optical_filter_beam_pe_min = 0.f;
+inline constexpr float optical_filter_veto_pe_max = 20.f;
 
-inline constexpr float topology_min_contained_fraction = 0.0f;
-inline constexpr float topology_min_cluster_fraction = 0.5f;
+inline constexpr int required_slice_count = 1;
+inline constexpr float slice_topological_score_min = 0.06f;
 
-inline constexpr float muon_min_track_score = 0.5f;
-inline constexpr float muon_min_track_length = 10.0f;
-inline constexpr float muon_max_track_distance = 4.0f;
-inline constexpr unsigned muon_required_generation = 2u;
+inline constexpr float contained_fraction_min = 0.0f;
+inline constexpr float slice_cluster_fraction_min = 0.5f;
 
-enum class Preset {
-    Empty,
-    Trigger,
-    Slice,
-    Fiducial,
-    Topology,
-    Muon,
-    InclusiveMuCC
+inline constexpr float muon_track_score_min = 0.5f;
+inline constexpr float muon_track_length_min = 10.0f;
+inline constexpr float muon_track_vertex_distance_max = 4.0f;
+inline constexpr unsigned muon_pfp_generation_required = 2u;
+
+enum class SelectionPreset {
+    None,
+    OpticalTriggerGate,
+    SliceQuality,
+    RecoFiducial,
+    TopologyQuality,
+    MuonCandidate,
+    InclusiveMuonCC
 };
 
-inline ROOT::RDF::RNode apply(ROOT::RDF::RNode node, Preset p, const SampleRecord& rec) {
-    switch (p) {
-    case Preset::Empty:
+inline ROOT::RDF::RNode apply_preset(ROOT::RDF::RNode node,
+                                    SelectionPreset preset,
+                                    const SampleRecord& record)
+{
+    switch (preset) {
+    case SelectionPreset::None:
         return node;
-    case Preset::Trigger:
-        return node.Filter([src = rec.source](float pe_beam, float pe_veto, int sw) {
-            const bool requires_dataset_gate = (src == Source::MC);
-            const bool dataset_gate = requires_dataset_gate
-                                          ? (pe_beam > trigger_min_beam_pe &&
-                                             pe_veto < trigger_max_veto_pe &&
-                                             sw > 0)
-                                          : true;
-            return dataset_gate;
-        },
-                           {"optical_filter_pe_beam", "optical_filter_pe_veto", "software_trigger"});
-    case Preset::Slice:
-        return node.Filter([](int ns, float topo) {
-            return ns == slice_required_count &&
-                   topo > slice_min_topology_score;
-        },
-                           {"num_slices", "topological_score"});
-    case Preset::Fiducial:
-        return node.Filter([](bool fv) { return fv; },
-                           {"in_reco_fiducial"});
-    case Preset::Topology:
-        return node.Filter([](float cf, float cl) {
-            return cf >= topology_min_contained_fraction &&
-                   cl >= topology_min_cluster_fraction;
-        },
-                           {"contained_fraction", "slice_cluster_fraction"});
-    case Preset::Muon:
+    case SelectionPreset::OpticalTriggerGate:
         return node.Filter(
-            [](const ROOT::RVec<float>& scores,
-               const ROOT::RVec<float>& lengths,
-               const ROOT::RVec<float>& distances,
-               const ROOT::RVec<unsigned>& generations) {
-                const auto n = scores.size();
-                for (std::size_t i = 0; i < n; ++i) {
-                    const bool passes = scores[i] > muon_min_track_score &&
-                                        lengths[i] > muon_min_track_length &&
-                                        distances[i] < muon_max_track_distance &&
-                                        generations[i] == muon_required_generation;
-                    if (passes) {
+            [source = record.source](float beam_pe, float veto_pe, int software_trigger) {
+                if (source != Source::MC) {
+                    return true;
+                }
+                return (beam_pe > optical_filter_beam_pe_min) &&
+                       (veto_pe < optical_filter_veto_pe_max) &&
+                       (software_trigger > 0);
+            },
+            {"optical_filter_pe_beam", "optical_filter_pe_veto", "software_trigger"});
+
+    case SelectionPreset::SliceQuality:
+        return node.Filter(
+            [](int slice_count, float topological_score) {
+                return slice_count == required_slice_count &&
+                       topological_score > slice_topological_score_min;
+            },
+            {"num_slices", "topological_score"});
+
+    case SelectionPreset::RecoFiducial:
+        return node.Filter([](bool in_reco_fiducial) { return in_reco_fiducial; },
+                           {"in_reco_fiducial"});
+
+    case SelectionPreset::TopologyQuality:
+        return node.Filter(
+            [](float contained_fraction, float slice_cluster_fraction) {
+                return contained_fraction >= contained_fraction_min &&
+                       slice_cluster_fraction >= slice_cluster_fraction_min;
+            },
+            {"contained_fraction", "slice_cluster_fraction"});
+
+    case SelectionPreset::MuonCandidate:
+        return node.Filter(
+            [](const ROOT::RVec<float>& track_shower_scores,
+               const ROOT::RVec<float>& track_lengths,
+               const ROOT::RVec<float>& track_vertex_distances,
+               const ROOT::RVec<unsigned>& pfp_generations) {
+                const auto track_count = track_shower_scores.size();
+                for (std::size_t i = 0; i < track_count; ++i) {
+                    const bool is_muon_candidate =
+                        (track_shower_scores[i] > muon_track_score_min) &&
+                        (track_lengths[i] > muon_track_length_min) &&
+                        (track_vertex_distances[i] < muon_track_vertex_distance_max) &&
+                        (pfp_generations[i] == muon_pfp_generation_required);
+                    if (is_muon_candidate) {
                         return true;
                     }
                 }
@@ -87,41 +100,62 @@ inline ROOT::RDF::RNode apply(ROOT::RDF::RNode node, Preset p, const SampleRecor
              "track_length",
              "track_distance_to_vertex",
              "pfp_generations"});
-    case Preset::InclusiveMuCC:
+
+    case SelectionPreset::InclusiveMuonCC:
     default: {
-        auto filtered = apply(node, Preset::Trigger, rec);
-        filtered = apply(filtered, Preset::Slice, rec);
-        filtered = apply(filtered, Preset::Fiducial, rec);
-        filtered = apply(filtered, Preset::Topology, rec);
-        return apply(filtered, Preset::Muon, rec);
+        auto filtered = apply_preset(node, SelectionPreset::OpticalTriggerGate, record);
+        filtered = apply_preset(filtered, SelectionPreset::SliceQuality, record);
+        filtered = apply_preset(filtered, SelectionPreset::RecoFiducial, record);
+        filtered = apply_preset(filtered, SelectionPreset::TopologyQuality, record);
+        return apply_preset(filtered, SelectionPreset::MuonCandidate, record);
     }
     }
 }
 
-struct EvalResult {
-    double denom = 0.0;
-    double numer = 0.0;
-    double selected = 0.0;
-    double efficiency() const { return denom > 0.0 ? numer / denom : 0.0; }
-    double purity() const { return selected > 0.0 ? numer / selected : 0.0; }
+struct SelectionMetrics {
+    double truth_signal_weight = 0.0;
+
+    double selected_weight = 0.0;
+
+    double selected_truth_signal_weight = 0.0;
+
+    double efficiency() const {
+        return truth_signal_weight > 0.0 ? (selected_truth_signal_weight / truth_signal_weight) : 0.0;
+    }
+    double purity() const {
+        return selected_weight > 0.0 ? (selected_truth_signal_weight / selected_weight) : 0.0;
+    }
 };
 
 template <class SignalPredicate>
-inline EvalResult evaluate(const std::vector<const SampleRecord*>& mc,
-                           const SignalPredicate& is_signal_truth,
-                           Preset final_selection) {
-    auto sumw = [](ROOT::RDF::RNode n){ auto r = n.Sum<float>("w_nominal"); return double(r.GetValue()); };
-    EvalResult out;
-    for (const SampleRecord* rec : mc) {
-        ROOT::RDF::RNode base = rec->nominal.rnode();
-        auto denom = base.Filter([&](int ch){ return is_signal_truth(ch); }, {"analysis_channels"});
-        out.denom += sumw(denom);
-        auto sel = apply(base, final_selection, *rec);
-        out.selected += sumw(sel);
-        auto numer = sel.Filter([&](int ch){ return is_signal_truth(ch); }, {"analysis_channels"});
-        out.numer += sumw(numer);
+inline SelectionMetrics evaluate_selection_metrics(const std::vector<const SampleRecord*>& mc_records,
+                                                  const SignalPredicate& is_truth_signal_channel,
+                                                  SelectionPreset selection_preset)
+{
+    auto sum_nominal_weight = [](ROOT::RDF::RNode node_in) {
+        auto sum = node_in.Sum<float>(nominal_weight_column);
+        return static_cast<double>(sum.GetValue());
+    };
+
+    SelectionMetrics totals;
+
+    for (const SampleRecord* record : mc_records) {
+        ROOT::RDF::RNode unselected = record->nominal.rnode();
+
+        auto truth_signal = unselected.Filter(
+            [&](int channel) { return is_truth_signal_channel(channel); },
+            {analysis_channel_column});
+        totals.truth_signal_weight += sum_nominal_weight(truth_signal);
+
+        auto selected = apply_preset(unselected, selection_preset, *record);
+        totals.selected_weight += sum_nominal_weight(selected);
+
+        auto selected_truth_signal = selected.Filter(
+            [&](int channel) { return is_truth_signal_channel(channel); },
+            {analysis_channel_column});
+        totals.selected_truth_signal_weight += sum_nominal_weight(selected_truth_signal);
     }
-    return out;
+    return totals;
 }
 
 }  // namespace selection
