@@ -88,7 +88,7 @@ SampleView SampleCatalog::sample(const SampleRecord& rec) const
     return SampleView{df_ptr, std::move(node)};
 }
 
-ROOT::RDF::RNode SampleCatalog::apply_slice(ROOT::RDF::RNode node, const SampleRecord& rec)
+ROOT::RDF::RNode SampleCatalog::apply_slice(ROOT::RDF::RNode node, const SampleRecord& rec) const
 {
     using strangeness::Slice;
     using strangeness::Source;

@@ -20,7 +20,7 @@ public:
                std::shared_ptr<FeatureDeriver> feature_deriver = std::make_shared<FeatureDeriver>());
 
   SampleView sample(const SampleRecord& rec) const;
-  ROOT::RDF::RNode apply_slice(ROOT::RDF::RNode node, const SampleRecord& rec);
+  ROOT::RDF::RNode apply_slice(ROOT::RDF::RNode node, const SampleRecord& rec) const;
 
   std::vector<const SampleRecord*> simulation_entries(
       const std::string& beamline,
