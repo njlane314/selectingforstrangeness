@@ -132,28 +132,28 @@ inline origin from_source_slice(Source src, Slice sl) {
 
 }  // namespace sample
 
-struct Frame {
+struct SampleView {
     std::shared_ptr<ROOT::RDataFrame> df;
     mutable std::optional<ROOT::RDF::RNode> node;
 
-    Frame() = default;
-    Frame(std::shared_ptr<ROOT::RDataFrame> df_in, ROOT::RDF::RNode node_in)
+    SampleView() = default;
+    SampleView(std::shared_ptr<ROOT::RDataFrame> df_in, ROOT::RDF::RNode node_in)
         : df(std::move(df_in)), node(std::move(node_in)) {}
 
     auto report() const {
         if (!node)
-            throw std::runtime_error("Frame::report: node is not initialised");
+            throw std::runtime_error("SampleView::report: node is not initialised");
         return node->Report();
     }
 
     ROOT::RDF::RNode rnode() const {
         if (!node)
-            throw std::runtime_error("Frame::rnode: node is not initialised");
+            throw std::runtime_error("SampleView::rnode: node is not initialised");
         return *node;
     }
 };
 
-struct Entry {
+struct SampleRecord {
     std::string beamline, period;
     Source source;
     Slice slice = Slice::BeamInclusive;
@@ -164,11 +164,11 @@ struct Entry {
     double pot_nom = 0.0, pot_eqv = 0.0;
     double trig_nom = 0.0, trig_eqv = 0.0;
 
-    Frame nominal;
-    std::unordered_map<std::string, Frame> detvars;
+    SampleView nominal;
+    std::unordered_map<std::string, SampleView> detvars;
 
     ROOT::RDF::RNode rnode() const { return nominal.rnode(); }
-    const Frame* detvar(const std::string& tag) const {
+    const SampleView* detvar(const std::string& tag) const {
         auto it = detvars.find(tag);
         return it == detvars.end() ? nullptr : &it->second;
     }
