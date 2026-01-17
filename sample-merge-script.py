@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import glob
 import os
 import re
@@ -436,15 +437,34 @@ def _write_meta(root_path: str, nums: dict[str, float], strs: dict[str, str]) ->
     f.Close()
 
 
-def _write_outxml(path: str, prod: str, project: str, merged_dir: str, run_db: str, tree: str, samples: list[dict]):
+def _write_outxml(
+    path: str,
+    prod: str,
+    project: str,
+    merged_dir: str,
+    run_db: str,
+    tree: str,
+    cfg_path: str,
+    tor_scale: float,
+    generated_at: str,
+    generator: str,
+    prescale_applied: str,
+    samples: list[dict],
+):
     root = ET.Element(
         "merged_samples",
         attrib={
+            "version": "1",
             "production_xml": prod,
             "project": project,
             "merged_dir": merged_dir,
             "run_db": run_db,
             "subrun_tree": tree,
+            "merge_config": cfg_path,
+            "toroid_scale": f"{float(tor_scale):.17g}",
+            "generated_at": generated_at,
+            "generator": generator,
+            "prescale_applied": prescale_applied,
         },
     )
     for s in samples:
@@ -465,6 +485,12 @@ def main(cfg_path: str) -> None:
         raise RuntimeError("missing config: " + cfg_path)
 
     prod, merged_dir, outxml, run_db, tor_scale, tree, threads, chunk, tmp, groups = _read_merge_config(cfg_path, base)
+
+    generated_at = (
+        datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    generator = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else os.path.basename(__file__)
+    prescale_applied = "yes" if _CONFDB is not None else "no"
 
     if not prod or not os.path.exists(prod):
         raise RuntimeError("production_xml not found: " + (prod or "(empty)"))
@@ -576,13 +602,31 @@ def main(cfg_path: str) -> None:
                     "exttrig_raw": f"{ext_raw:.17g}",
                     "exttrig_prescaled": f"{ext_prescaled:.17g}",
                     "ext_pot_equiv": f"{ext_pot_equiv:.17g}",
+                    "runinfo_subruns_matched": matched,
+                    "ea9_column": ea9c,
+                    "tortgt_column": tortc,
+                    "exttrig_column": extc,
+                    "prescale_applied": prescale_applied,
                 }
             )
 
         finally:
             cleanup()
 
-    _write_outxml(outxml, prod, project, merged_dir, run_db, tree, samples_out)
+    _write_outxml(
+        outxml,
+        prod,
+        project,
+        merged_dir,
+        run_db,
+        tree,
+        cfg_path,
+        tor_scale,
+        generated_at,
+        generator,
+        prescale_applied,
+        samples_out,
+    )
     print(f"[merge] wrote {outxml}")
 
 
